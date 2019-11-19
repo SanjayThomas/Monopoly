@@ -12,28 +12,14 @@ MAX_HOTELS = 12
 NUMBER_OF_PROPERTIES = 42
 
 class Property:
-	def __init__(self,houses,mortgaged,owned,ownerId,propertyId):
-		self.houses = houses #value in range 0-5
+	def __init__(self,houses,mortgaged,ownerId,propertyId):
+		self.houses = houses # value in range 0-5
 		self.mortgaged = mortgaged #boolean
-		self.owned = owned #boolean
 		self.ownerId = ownerId
 		self.propertyId = propertyId 
 	
 	def convert(self):
-		hotel = False
-		newHouses = self.houses
-		if self.houses>4:
-			hotel=True
-			newHouses=0
-		return {"houses":newHouses,"hotel":hotel,"mortgaged":self.mortgaged,"owned":self.owned,"ownerId":self.ownerId}
-
-class Debt:
-	def __init__(self,bank,otherPlayers):
-		self.bank = bank
-		self.otherPlayers = otherPlayers
-		
-	def convert(self):
-		return {"bank":self.bank,"otherPlayers":self.otherPlayers}
+		return {"houses":self.houses,"mortgaged":self.mortgaged,"ownerId":self.ownerId}
 
 class State:
 	def __init__(self, playerIds,properties=None):		
@@ -43,17 +29,16 @@ class State:
 		
 		self.turnNumber = -1
 		self.currentPlayerId = None
-		#This causes same instance to be repeated for the entire list
-		#[Property(0,False,False,0)]*NUMBER_OF_PROPERTIES
+		
 		if properties == None:
-			self.properties = [Property(0,False,False,0,i) for i in range(NUMBER_OF_PROPERTIES)]
+			self.properties = [Property(0,False,None,i) for i in range(NUMBER_OF_PROPERTIES)]
 		else:
 			#no validation here
 			self.properties = properties
 		self.positions = {}
 		self.cash = {}
 		self.bankrupt = {}
-		self.phase = Phase.NO_ACTION
+		self.phase = Phase.START_GAME
 		self.phasePayload = None
 		self.debt = {}
 		
@@ -69,13 +54,7 @@ class State:
 			self.timeoutTracker[playerId] = False
 			self.reason_for_loss[playerId] = None
 			self.turn_of_loss[playerId] = -1
-			
-			bankDebt = 0
-			otherPlayersDebt = {}
-			for otherPlayerId in self.players:
-				if otherPlayerId!=playerId:
-					otherPlayersDebt[otherPlayerId] = 0 #debt to other players
-			self.debt[playerId] = Debt(bankDebt,otherPlayersDebt)
+			self.debt[playerId] = 0
 	
 	"""The index of the player in the players array"""
 	"""This represents the order of play for the player"""
@@ -150,42 +129,21 @@ class State:
 		self.phasePayload = phasePayload
 
 	"""DEBT"""
-	#TODO: FOLLOWING 2 METHODS ARE CURRENTLY NOT USED. ARE THEY NEEDED?
-	def getDebtToPlayers(self,playerId):
-		totalDebt = 0
-		for _,otherPlayerDebt in self.debt[playerId].otherPlayers.items():
-			totalDebt+=otherPlayerDebt
-		return totalDebt
+	def getDebt(self,playerId):
+		return self.debt[playerId]
 	
-	def getDebtToBank(self,playerId):
-		return self.debt[playerId].bank
-	
-	def setDebtToPlayer(self,playerId,otherPlayerId,amount):
-		self.debt[playerId].otherPlayers[otherPlayerId] = amount
-	
-	def addDebtToBank(self,playerId,amount):
-		self.debt[playerId].bank += amount
+	def addDebt(self,playerId,amount):
+		self.debt[playerId] += amount
 	
 	def clearDebt(self,playerId):
 		playerCash = self.getCash(playerId)
-		for otherPlayerId,debt in self.debt[playerId].otherPlayers.items():
-			if playerCash>= debt:
-				playerCash-=debt
-				self.setCash(otherPlayerId, self.getCash(otherPlayerId)+debt)
-				self.debt[playerId].otherPlayers[otherPlayerId] = 0
-			else:
-				#Unpaid debt to another player, on rare occasion, there could be debts to multiple players.
-				self.markPlayerLost(playerId, Reason.BANKRUPT)
-				pass
-		debtToBank = self.debt[playerId].bank
-		if playerCash>=debtToBank:
-			playerCash-=debtToBank
-			self.debt[playerId].bank = 0
+		debt = self.getDebt(playerId)
+		if playerCash >= debt:
+			self.setCash(playerId, playerCash - debt)
+			self.debt[playerId] = 0
 		else:
 			#Unpaid debt to the bank
 			self.markPlayerLost(playerId, Reason.BANKRUPT)
-			pass
-		self.setCash(playerId, playerCash)
 		
 	"""JAIL COUNTER"""
 	def getJailCounter(self,playerId):
@@ -201,10 +159,10 @@ class State:
 	
 	"""OWNERSHIP FUNCTIONS"""
 	def isPropertyOwned(self,propertyId):
-		return self.properties[propertyId].owned
+		return self.properties[propertyId].ownerId is not None
 	
 	def setPropertyUnowned(self,propertyId):
-		self.properties[propertyId].owned = False
+		self.properties[propertyId].ownerId = None
 		self.properties[propertyId].houses = 0
 		self.properties[propertyId].mortgaged = False
 		
@@ -212,13 +170,13 @@ class State:
 		return self.properties[propertyId].ownerId
 	
 	def setPropertyOwner(self,propertyId,playerId):
-		self.properties[propertyId].owned = True
 		self.properties[propertyId].ownerId = playerId
-		self.properties[propertyId].houses = 0 #If a property changes ownership, it should always have no houses on it.
+		# If a property changes ownership, it should start with no houses
+		self.properties[propertyId].houses = 0
 	
 	# logic to be changed
 	def rightOwner(self,playerId,propertyId):
-		return self.properties[propertyId].owned and self.getPropertyOwner(propertyId) == playerId
+		return self.getPropertyOwner(propertyId) == playerId
 	
 	"""MORTGAGE FUNCTIONS"""
 	def isPropertyMortgaged(self,propertyId):
@@ -260,7 +218,7 @@ class State:
 	that the player owns all the properties in the monopoly and that they are all unmortgaged.
 	and that houses are being built evenly.
 	"""
-	def isBuyingHousesSequenceValid(self, playerId,propertySequence):
+	def isSequenceValid(self,playerId,propertySequence,sign):
 		propertiesCopy = deepcopy(self.properties)
 		for propertyId,housesCount in propertySequence:
 			if board[propertyId]['class']!="Street":
@@ -270,53 +228,29 @@ class State:
 			if (currentProperty.ownerId!=playerId) or (currentProperty.mortgaged):
 				return False
 			
-			for monopolyPropertyId in board[propertyId]["monopoly_group_elements"]:
-				monopolyProperty = propertiesCopy[monopolyPropertyId]
+			for monopolyId in board[propertyId]["monopoly_group_elements"]:
+				monopolyProperty = propertiesCopy[monopolyId]
 				if (monopolyProperty.ownerId!=playerId) or (monopolyProperty.mortgaged):
 					return False
 			
-			newHousesCount = currentProperty.houses+housesCount
-			if (newHousesCount>4) or (newHousesCount<0):
+			newHousesCount = currentProperty.houses+(sign*housesCount)
+			if (newHousesCount>5) or (newHousesCount<0):
 				return False
-			
-			propertiesCopy[propertyId].houses+=housesCount
+			propertiesCopy[propertyId].houses+=(sign*housesCount)
 		
 		for propertyId,_ in propertySequence:
 			houses = propertiesCopy[propertyId].houses
-			for monopolyPropertyId in board[propertyId]["monopoly_group_elements"]:
-				monopolyHouses = propertiesCopy[monopolyPropertyId].houses
+			for monopolyId in board[propertyId]["monopoly_group_elements"]:
+				monopolyHouses = propertiesCopy[monopolyId].houses
 				if abs(monopolyHouses-houses)>1:
 					return False
 		return True
+	
+	def isBuyingSequenceValid(self, playerId,propertySequence):
+		return self.isSequenceValid(playerId, propertySequence, 1)
 		
 	def isSellingSequenceValid(self,playerId,propertySequence):
-		propertiesCopy = deepcopy(self.properties)
-		for propertyId,housesCount,hotel in propertySequence:
-			if board[propertyId]['class']!="Street":
-				return False
-			
-			currentProperty = propertiesCopy[propertyId]
-			if (currentProperty.ownerId!=playerId) or (currentProperty.mortgaged):
-				return False
-			
-			for monopolyPropertyId in board[propertyId]["monopoly_group_elements"]:
-				monopolyProperty = propertiesCopy[monopolyPropertyId]
-				if (monopolyProperty.ownerId!=playerId) or (monopolyProperty.mortgaged):
-					return False
-			
-			if hotel: housesCount+=1
-			newHousesCount = currentProperty.houses-housesCount
-			if (newHousesCount>5) or (newHousesCount<0):
-				return False
-			propertiesCopy[propertyId].houses-=housesCount
-		
-		for propertyId,_,_ in propertySequence:
-			houses = propertiesCopy[propertyId].houses
-			for monopolyPropertyId in board[propertyId]["monopoly_group_elements"]:
-				monopolyHouses = propertiesCopy[monopolyPropertyId].houses
-				if abs(monopolyHouses-houses)>1:
-					return False
-		return True
+		return self.isSequenceValid(playerId, propertySequence, -1)
 	
 	def evaluateBuyingHousesSequence(self,sequence):
 		totalCurrentHouses = 0
@@ -391,10 +325,6 @@ class State:
 			raise e
 	
 	def toDict(self):
-		newDebt = {}
-		for key,debtObj in self.debt.items():
-			newDebt[key] = debtObj.convert()
-		
 		return OrderedDict([ ("player_ids", self.players),
 					("current_player_id", self.currentPlayerId),
 					("turn_number", self.turnNumber),
@@ -402,9 +332,9 @@ class State:
 					("player_board_positions", self.positions),
 					("player_cash",self.cash),
 					("player_loss_status", self.bankrupt),
-					("current_phase_number", self.phase),
+					("phase", self.phase),
 					("phase_payload", self.phasePayload),
-					("player_debts", newDebt) ])
+					("player_debts", self.debt) ])
 	
 	def toJson(self):
 		return json.dumps(self.toDict())
@@ -413,16 +343,105 @@ class State:
 		return str(self.toJson())
 	
 class Phase:
-	NO_ACTION = 0
-	TRADE = 1
-	DICE_ROLL = 2
-	BUYING = 3
-	AUCTION = 4
-	PAYMENT = 5
-	JAIL = 6
-	CHANCE_CARD = 7
-	COMMUNITY_CHEST_CARD = 8
-	TRADE_RESPONSE = 9
+	# these are mandatory phases
+	START_GAME         = 'START_GAME' # broadcast but mandatory
+	START_TURN         = 'START_TURN' # optional
+	JAIL               = 'JAIL'
+
+	JAIL_RESULT        = 'JAIL_RESULT' # optional
+	
+	DICE_ROLL          = 'DICE_ROLL' # optional
+	CHANCE_CARD        = 'CHANCE_CARD' # optional, which chance card was drawn
+	COMMUNITY_CHEST    = 'COMMUNITY_CHEST' # optional
+	MORTGAGE           = 'MORTGAGE'
+	
+	MORTGAGE_RESULT    = 'MORTGAGE_RESULT' # optional,returns tuple of booleans saying which requests were successful
+	
+	SELL_HOUSES        = 'SELL_HOUSES'
+	
+	SELL_HOUSES_RESULT = 'SELL_HOUSES_RESULT'
+	
+	BUY                = 'BUY'
+	
+	BUY_RESULT         = 'BUY_RESULT' # broadcast whether user is going to buy or auction
+	
+	AUCTION            = 'AUCTION'
+	
+	AUCTION_RESULT     = 'AUCTION_RESULT' # optional
+	TRADE              = 'TRADE'
+	TRADE_RESPONSE     = 'TRADE_RESPONSE'
+	TRADE_RESULT       = 'TRADE_RESULT' # optional
+	
+	BUY_HOUSES         = 'BUY_HOUSES'
+	
+	BUY_HOUSES_RESULT  = 'BUY_HOUSES_RESULT' # optional
+	
+	END_TURN           = 'END_TURN' # optional
+	END_GAME           = 'END_GAME'
+
+	BANKRUPT           = 'BANKRUPT' # this agent is bankrupt
+
+
+# Phase Payload definition:
+# START_GAME :
+# nil
+# nil
+# JAIL :
+# how many turns you have been in jail
+# ('c',<card no>) or 'p' or 'd'
+# BUY  : nil
+# true = buy, false = auction
+# BUY_RESULT:
+# true = buy, false = auction
+# nil
+# AUCTION:
+# nil
+# int bid value
+# MORTGAGE:
+# nil
+# [props to be (un)mortgaged]
+# SELL_HOUSES:
+# nil
+# [(prop,# houses),...]
+# TRADE:
+# nil
+# [(agentId, cashOffer, cashGet, propsOffer, propsGet)]
+# TRADE_RESPONSE:
+# (agentId, cashOffer, cashGet, propsOffer, propsGet)
+# true = accept, false = reject
+# BUY_HOUSES:
+# nil
+# [(prop,# houses),...]
+# END_GAME:
+# nil
+# nil
+
+# response for all these are nil
+# START_TURN
+# nil
+# JAIL_RESULT
+# true = out of jail, false = jailed
+# DICE_ROLL
+# (die1,die2)
+# CHANCE_CARD
+# cardId
+# COMMUNITY_CHEST
+# cardId
+# AUCTION_RESULT
+# agentId of winner
+# MORTGAGE_RESULT
+# [true/false,...]
+# SELL_HOUSES_RESULT
+# [true/false,...]
+# TRADE_RESULT
+# [true/false,...]
+# BUY_HOUSES_RESULT
+# [true/false,...]
+# END_TURN
+# nil
+# BANKRUPT
+# [agentIds bankrupted this turn]
+
 	
 """
 The reason for victory:
@@ -437,7 +456,6 @@ class Reason:
 	BANKRUPT = "Bankruptcy"
 	
 #state = State([1,2,3,4])
-#print(state.phasePayload)
 #print(state.toJson())
 #for value in json.loads(state.toJson()):
 #	print(value)

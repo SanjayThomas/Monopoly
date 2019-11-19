@@ -1,0 +1,43 @@
+{
+  "name": "monopoly-ai",
+  "version": "0.1.0",
+  "private": true,
+  "homepage": "/game",
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^1.2.25",
+    "@fortawesome/free-solid-svg-icons": "^5.11.2",
+    "@fortawesome/react-fontawesome": "^0.1.7",
+    "autobahn": "^19.9.2",
+    "bootstrap": "^4.3.1",
+    "copy-to-clipboard": "^3.2.0",
+    "react": "^16.10.1",
+    "react-bootstrap": "^1.0.0-beta.12",
+    "react-dom": "^16.10.1",
+    "react-google-login": "^5.0.5",
+    "react-redux": "^7.1.1",
+    "react-router-dom": "^5.1.2",
+    "react-scripts": "3.1.2",
+    "redux": "^4.0.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

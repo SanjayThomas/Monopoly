@@ -1,15 +1,3 @@
-import threading
-from functools import wraps
-		
-class TimeoutBehaviour:
-	"""
-	Used during the start of a game. The adjudicator will wait for 5 min for all the players to join.
-	If all the players haven't joined by this time, based on the enum value here, the game maybe
-	started anyway or stopped immediately.
-	"""
-	PLAY_ANYWAY = 0,
-	STOP_GAME = 1
-
 def typecast(val,thetype,default):
 	"""
 	Validation function which checks if the variable `var` can be typecast to datatype `thetype`.

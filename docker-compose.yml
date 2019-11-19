@@ -15,12 +15,23 @@ services:
     restart: on-failure
     networks:
       - gateway
-  webapp:
-    build: ./web-ui
-    container_name: webapp
+  webpages:
+    build: ./webpages
+    container_name: webpages
     tty: true
     volumes:
       - webapp:/app/
+  db:
+    image: mysql/mysql-server:5.7.22
+    container_name: db
+    ports:
+      - "3306:3306"
+    networks:
+      - gateway
+    volumes:
+      - ./monopoly.sql:/docker-entrypoint-initdb.d/monopoly.sql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
 
 networks:
   gateway: {}

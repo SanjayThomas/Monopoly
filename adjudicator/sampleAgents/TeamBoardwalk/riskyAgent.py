@@ -4,22 +4,22 @@ from board import Type, Group
 from state import State
 from baseAgent import BaseAgent
 
+import six
+from autobahn.twisted.wamp import ApplicationRunner
+
 class RiskyAgent(BaseAgent):
 	def startGame(self,state):
+		print("Inside startGame")
 		self.pid = self.id
 		self.minMoney = 200
 		self.stealing = False
-	
-	def startTurn(self,state):
 		return None
 	
-	def endTurn(self,state):
-		return None
-	
-	def getBSMDecision(self, state):
+	def mortgage(self,state):
 		state = State(state)
-		if state.money[self.pid] - state.debt[self.pid].getTotalDebt() < 0:
-			return self.getBestActionForMoney(state)
+		print("Inside mortgage Listener")
+		if state.money[self.pid] - state.debt[self.pid] < 0:
+			return self.getBestMortgageAction(state, [])
 		if state.money[self.pid] < self.getSafeMoney(state):
 			return self.getBestMortgageAction(state, state.getOwnedGroupProperties(self.pid))
 		bestGroup = self.getBestGroupToImprove(state)
@@ -30,17 +30,34 @@ class RiskyAgent(BaseAgent):
 				return self.getBestMortgageAction(state, state.getOwnedGroupProperties(self.pid))
 			for prop in groupProps:
 				if prop.mortgaged:
-					return "M", [prop.id]
-			return "B", [(prop.id, 1) for prop in groupProps]
+					return [prop.id]
+		return None
+	
+	def sellHouses(self,state):
+		state = State(state)
+		print("Inside sellHouses Listener")
+		if state.money[self.pid] - state.debt[self.pid] < 0:
+			return self.getBestSellingAction(state)
+		return None
+	
+	def buyHouses(self,state):
+		state = State(state)
+		print("Inside buyHouses Listener")
+		bestGroup = self.getBestGroupToImprove(state)
+		if bestGroup:
+			groupProps = state.getGroupProperties(bestGroup)
+			cost = len(groupProps) * groupProps[0].data.houseCost
+			if state.money[self.pid] < self.getSafeMoney(state) + cost:
+				return [(prop.id, 1) for prop in groupProps]
 		return None
 
 	def respondTrade(self, state):
-		return False
+		return True
 
 	def buyProperty(self, state):
 		state = State(state)
 		prop = state.properties[state.phaseData]
-		print("Inside buyListener for "+str(self.pid)+" with prop id: "+str(prop))
+		print("Inside buyListener for {} with prop id: {}".format(self.pid,state.phaseData))
 		opponents = state.getOpponents(self.pid)
 		bestGroup = self.getBestGroupToImprove(state)
 		if bestGroup: return False
@@ -53,7 +70,7 @@ class RiskyAgent(BaseAgent):
 
 	def auctionProperty(self, state):
 		state = State(state)
-		print("Inside auctionListener for "+str(self.pid)+" with prop id: "+str(state.phaseData))
+		print("Inside auctionListener for {} with prop id: {}".format(self.pid,state.phaseData))
 		data = None 
 		if type(state.phaseData) is int:
 			data = state.phaseData
@@ -79,10 +96,44 @@ class RiskyAgent(BaseAgent):
 		else:
 			return "P"
 
-	def receiveState(self, state):
-		pass
-
 	def getTradeDecision(self,state):
+		state = State(state)
+		# propose trade which completes a monopoly for current agent
+		my_groups = []
+
+		for group in range(0,8):
+			my_count = 0
+			opp_id = None
+			opp_prop = None
+			props = state.getGroupProperties(group)
+			for prop in props:
+				if prop.owner == self.pid:
+					my_count+=1
+				elif prop.owner is not None:
+					opp_id = prop.owner
+					opp_prop = prop.id
+
+			if (my_count == len(props) - 1) and (opp_id is not None):
+				print("Going to propose trade to {}".format(opp_id))
+				if state.money[self.pid] > 100:
+					cashOffer = 100
+				else:
+					cashOffer = state.money[self.pid]
+				
+				propOffer = []
+				for uGroup in range(8,10):
+					breakCondition = False
+					uProps = state.getGroupProperties(uGroup)
+					for uProp in uProps:
+						if uProp.owner == self.pid:
+							propOffer = [uProp.id]
+							breakCondition = True
+							break
+					if breakCondition:
+						break
+				print("Prop offered: {}".format(propOffer))
+				return [opp_id,cashOffer,propOffer,10,[opp_prop]]
+
 		return None
 	  
 	def endGame(self,winner):
@@ -100,7 +151,7 @@ class RiskyAgent(BaseAgent):
 	def getSafeMoney(self, state):
 		maxRent = 0
 		for prop in state.properties:
-			if (prop.owned and prop.owner == self.pid) or prop.id >= 40: continue
+			if (prop.owner == self.pid) or prop.id >= 40: continue
 			rent = 0
 			if prop.data.type == Type.PROPERTY:
 				rent = prop.data.rents[prop.houses]
@@ -148,16 +199,23 @@ class RiskyAgent(BaseAgent):
 				if ratio > maxRatio:
 					maxRatio = ratio
 					bestProp = prop
-		if bestProp: return "M", [bestProp.id]
+		if bestProp: return [bestProp.id]
 		return None
 
-	def getBestActionForMoney(self, state):
-		mortgageAction = self.getBestMortgageAction(state, [])
-		if mortgageAction: return mortgageAction
+	def getBestSellingAction(self, state):
 		ownedGroups = state.getOwnedBuildableGroups(self.pid)
 		for group in ownedGroups:
 			groupProps = state.getGroupProperties(group)
 			if groupProps[0].houses > 0:
-				return "S", [(prop.id, 1) for prop in groupProps]
+				return [(prop.id, 1, False) for prop in groupProps]
 
+if __name__ == '__main__':
+	if len(sys.argv) < 3:
+		sys.exit("Not enough arguments")
 	
+	url = environ.get("CBURL", u"ws://127.0.0.1:4000/ws")
+	if six.PY2 and type(url) == six.binary_type:
+		url = url.decode('utf8')
+	realm = environ.get('CBREALM', u'realm1')
+	runner = ApplicationRunner(url, realm)
+	runner.run(RiskyAgent)

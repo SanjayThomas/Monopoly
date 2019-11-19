@@ -1,136 +1,135 @@
-from actions.action import Action
-from utils import crange,typecast,check_valid_cash
+from utils import typecast,check_valid_cash
 from constants import board
+from state import Phase
 from config import log
+from actions.constants import MAX_TRADES, BOARD_SIZE
 
-class HandleTrade(Action):
-	
-	def publish(self):
-		self.agentsYetToRespond = list(self.state.getLivePlayers())
-		self.tradeActions = []
-		currentPlayerIndex = self.state.getCurrentPlayerIndex()
-		for i in crange(currentPlayerIndex,currentPlayerIndex-1,self.TOTAL_NO_OF_PLAYERS):
-			playerId = self.PLAY_ORDER[i]
-			if not self.state.hasPlayerLost(playerId):
-				self.publishAction(playerId,"TRADE_IN")
-		
-	def subscribe(self,*args):
-		"""
-		Stopping conditions for Trade:
-		1. If during a given turn, no player gave a valid Trade, Trade ends.
-		2. A player can only make MAX_TRADE_REQUESTS number of requests in a given Trade Phase.
-		"""
-		agentId = None
-		tradeAction = None
-		if len(args)>0:
-			agentId = args[0]
-		if len(args)>1:
-			tradeAction = args[1]
-		
-		if self.canAccessSubscribe(agentId):
-			self.tradeActions.append( (agentId,tradeAction) )
-			
-			if self.validSubs>=len(self.state.getLivePlayers()):
-				#if all the trade requests have been received
-				actionCount = 0
-				validTradeRequests = {}
-				for agentId in self.state.getLivePlayers():
-					validTradeRequests[agentId] = []
-				
-				for agentId,action in self.tradeActions:
-					if not isinstance(action, list) and not isinstance(action, tuple):
-						continue
-					if len(action) != 5:
-						continue
-					otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest = action
-					if self.validateTradeAction(agentId,otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest):
-						validTradeRequests[otherAgentId].append((agentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest))
-						actionCount+=1
+def publish(context):
+	state = context.state
+	# should start with the current player's ID always
+	agentId = context.bsmAgentId
 
-				"""All agents have responded or have timed out"""
-				if actionCount == 0:
-					#end trade and start the post Trade BSM phase
-					#self.publishBSM(self.context.conductBSM.nextAction)
-					#TODO: Temporarily calling the nextAction stored in BSM so that the second BSM is not started here.
-					nextAction = getattr(self.context, self.context.conductBSM.nextAction)
-					nextAction.setContext(self.context)
-					nextAction.publish()
-				else:
-					self.context.tradeResponse.validTradeRequests = validTradeRequests
-					self.context.tradeResponse.setContext(self.context)
-					self.context.tradeResponse.publish()
+	if state.bankrupt[agentId]:
+		return []
+
+	log("game","Agent {} can trade!".format(agentId))
 	
-	def publishBSM(self,nextAction):
-		self.context.conductBSM.previousAction = "handleTrade"
-		self.context.conductBSM.nextAction = nextAction
-		self.context.conductBSM.BSMCount = 0
-		self.context.conductBSM.canAgentDoBSM = {}
-		for agentId in self.PLAY_ORDER:
-			if self.state.hasPlayerLost(agentId):
-				self.context.conductBSM.canAgentDoBSM[agentId] = False
-			else:
-				self.context.conductBSM.canAgentDoBSM[agentId] = True
-		self.context.conductBSM.setContext(self.context)
-		self.context.conductBSM.publish()
+	return [agentId]
 	
-	"""
-	Property may be Get Out of Jail Free cards (propertyId = 40,41)
-	The property being traded and other properties in the same color group
-	can't have houses/hotels on them.
-	"""
-	def validPropertyToTrade(self,playerId, propertyId):
-		propertyId = typecast(propertyId,int,-1)
-		if propertyId<0 or propertyId>self.BOARD_SIZE+1:
-			return False
-		if not self.state.rightOwner(playerId,propertyId):
-			return False
-		if propertyId > self.BOARD_SIZE-1:
+def subscribe(context,responses):
+	state = context.state
+	agentId,tradeAction = list(responses.items())[0]
+
+	if validateTradeAction(context,agentId,tradeAction):
+		otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest = tradeAction
+		tradeRequest = (agentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest)
+		state.setPhasePayload(tradeRequest)
+		context.tradeReceiver = otherAgentId
+		return Phase.TRADE_RESPONSE
+
+	context.tradeCounter+=1
+	if context.tradeCounter < MAX_TRADES:
+		# continue trades for the same agent
+		return Phase.TRADE
+
+	noPlayers = len(context.PLAY_ORDER)
+	nextIndex = (state.getPlayerIndex(agentId) + 1) % noPlayers
+	nextAgentId = state.getPlayerId(nextIndex)
+	currentAgentId = state.getCurrentPlayerId()
+	context.bsmAgentId = nextAgentId
+
+	# resetting trade counter for other agents
+	context.tradeCounter = 0
+
+	if isBuyDecision(state) and agentId == currentAgentId:
+		# trading is done for all agents in this turn
+		return Phase.BUY
+
+	if nextAgentId == currentAgentId:
+		# trading is done for all agents in this turn
+		if context.auctionStarted:
+			return Phase.AUCTION
+		return Phase.BUY_HOUSES
+	
+	# do mortgage, selling and trade for the next agent
+	return Phase.MORTGAGE
+
+# is the current player on an unowned property?
+# this would mean there is a buy/auction decision to be made in this turn
+def isBuyDecision(state):
+	currentPlayerId = state.getCurrentPlayerId()
+	playerPosition = state.getPosition(currentPlayerId)
+	propertyClass = board[playerPosition]['class']
+	
+	if propertyClass == 'Street' or propertyClass == 'Railroad' or propertyClass == 'Utility':
+		isPropertyOwned = state.isPropertyOwned(playerPosition)
+		if not isPropertyOwned:
 			return True
-		if board[propertyId]['class']=="Railroad" and board[propertyId]['class']=="Utility":
-			return True
-		if board[propertyId]['class']!="Street":
-			return False
-		if self.state.getNumberOfHouses(propertyId) > 0:
-			return False
-		for monopolyElement in board[propertyId]['monopoly_group_elements']:
-			if self.state.getNumberOfHouses(monopolyElement) > 0:
-				return False
-		return True
 	
-	"""Checks if a proposed trade is valid"""
-	def validateTradeAction(self,agentId,otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest):
-		
-		passed = False
-		if otherAgentId == agentId:
-			return False
-		for playerId in self.state.getLivePlayers():
-			if otherAgentId == playerId:
-				passed = True
-				break
-		if not passed:
-			return False
-		
-		cashOffer = check_valid_cash(cashOffer)
-		cashRequest = check_valid_cash(cashRequest)
-		currentPlayerCash = self.state.getCash(agentId)
-		otherPlayerCash = self.state.getCash(otherAgentId)
-		if cashOffer > currentPlayerCash:
-			return False
-		if cashRequest > otherPlayerCash:
-			return False
-		
-		if not isinstance(propertiesOffer, list) and not isinstance(propertiesOffer, tuple):
-				return False
-		else:
-			for propertyId in propertiesOffer:
-				if not validPropertyToTrade(agentId, propertyId):
-					return False
-		
-		if not isinstance(propertiesRequest, list) and not isinstance(propertiesRequest, tuple):
-				return False
-		else:
-			for propertyId in propertiesRequest:
-				if not validPropertyToTrade(otherAgentId, propertyId):
-					return False
-		
+	return False
+
+"""
+Property may be Get Out of Jail Free cards (propertyId = 40,41)
+The property being traded and other properties in the same color group
+can't have houses/hotels on them.
+"""
+def validPropertyToTrade(context,playerId, propertyId):
+	state = context.state
+	propertyId = typecast(propertyId,int,-1)
+	if propertyId<0 or propertyId>BOARD_SIZE+1:
+		return False
+	if not state.rightOwner(playerId,propertyId):
+		return False
+	if propertyId > BOARD_SIZE-1:
 		return True
+	if board[propertyId]['class']=="Railroad" or board[propertyId]['class']=="Utility":
+		return True
+	if board[propertyId]['class']!="Street":
+		return False
+	if state.getNumberOfHouses(propertyId) > 0:
+		return False
+	for monopolyElement in board[propertyId]['monopoly_group_elements']:
+		if state.getNumberOfHouses(monopolyElement) > 0:
+			return False
+	return True
+
+"""Checks if a proposed trade is valid"""
+def validateTradeAction(context,agentId,action):
+	if not isinstance(action, list) and not isinstance(action, tuple):
+		return False
+	if len(action) != 5:
+		return False
+	otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest = action
+	state = context.state
+	passed = False
+	if otherAgentId == agentId:
+		return False
+	for playerId in state.getLivePlayers():
+		if otherAgentId == playerId:
+			passed = True
+			break
+	if not passed:
+		return False
+	
+	cashOffer = check_valid_cash(cashOffer)
+	cashRequest = check_valid_cash(cashRequest)
+	currentPlayerCash = state.getCash(agentId)
+	otherPlayerCash = state.getCash(otherAgentId)
+	if cashOffer > currentPlayerCash:
+		return False
+	if cashRequest > otherPlayerCash:
+		return False
+	
+	if not isinstance(propertiesOffer, list) and not isinstance(propertiesOffer, tuple):
+			return False
+	for propertyId in propertiesOffer:
+		if not validPropertyToTrade(context, agentId, propertyId):
+			return False
+
+	if not isinstance(propertiesRequest, list) and not isinstance(propertiesRequest, tuple):
+			return False
+	for propertyId in propertiesRequest:
+		if not validPropertyToTrade(context, otherAgentId, propertyId):
+			return False
+	
+	return True

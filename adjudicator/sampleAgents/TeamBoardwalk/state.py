@@ -19,32 +19,20 @@ class StateList(list):
 		return StateList(self)
 
 class Property:
-	def __init__(self, id, owned, owner, houses, mortgaged):
+	def __init__(self, id, owner, houses, mortgaged):
 		self.id = id
 		self.data = board[id] if id < 40 else None
-		self.owned = owned
 		self.owner = owner
 		# 5 houses = hotel
 		self.houses = houses
 		self.mortgaged = mortgaged
 	
 	def __str__(self):
-		return str(self.id)+","+str(self.owned)+","+str(self.owner)+","+str(self.houses)+","+str(self.mortgaged)
+		return str(self.id)+","+str(self.owner)+","+str(self.houses)+","+str(self.mortgaged)
 	
 	# speed up deepcopy of state
 	def __deepcopy__(self, memo):
-		return Property(self.id, self.owned, self.owner, self.houses, self.mortgaged)
-
-class Debt:
-	def __init__(self,bank,otherPlayers):
-		self.bank = bank
-		self.otherPlayers = otherPlayers
-		
-	def getTotalDebt(self):
-		debt = self.bank
-		for playerId,playerDebt in self.otherPlayers.items():
-			debt += playerDebt
-		return debt
+		return Property(self.id, self.owner, self.houses, self.mortgaged)
 
 class State:
 	def __init__(self, stateTuple):
@@ -55,23 +43,17 @@ class State:
 			self.turn = stateTuple['turn_number']
 			self.properties = []
 			for id, value in enumerate(stateTuple['properties']):
-				owned = value['owned']
 				owner = value['ownerId']
 				mortgaged = value['mortgaged']
 				houses = value['houses']
-				if value['hotel']: houses=5
-				self.properties.append(Property(id, owned, owner, houses, mortgaged))
+				self.properties.append(Property(id, owner, houses, mortgaged))
 			
 			self.positions = stateTuple['player_board_positions']
 			self.money = stateTuple['player_cash']
 			self.bankrupt = stateTuple['player_loss_status']
-			self.phase = stateTuple['current_phase_number']
+			self.phase = stateTuple['phase']
 			self.phaseData = stateTuple['phase_payload']
-			self.debt = {}
-			for id, value in stateTuple['player_debts'].items():
-				bank = value['bank']
-				otherPlayers = value['otherPlayers']
-				self.debt[id] = Debt(bank,otherPlayers)
+			self.debt = stateTuple['player_debts']
 	
 	def getOpponents(self,id):
 		return [playerId for playerId in self.player_ids if not playerId==id]
@@ -97,14 +79,12 @@ class State:
 
 	def getGroupProperties(self, group):
 		if group<0 or group>=len(groups):
-			print(group)
-		for id in groups[group]:
-			if id<0 or id>len(self.properties):
-				print("id: ",id)	
+			# invalid index
+			return []
 		return [self.properties[id] for id in groups[group]]
 
 	def getOwnedProperties(self, player):
-		return [prop for prop in self.properties if prop.owned and prop.owner == player and prop.id < 40]
+		return [prop for prop in self.properties if prop.owner == player and prop.id < 40]
 
 	def getOwnedGroupProperties(self, player):
 		owned = self.getOwnedProperties(player)
@@ -118,13 +98,13 @@ class State:
 
 	def playerOwnsGroup(self, player, group):
 		for prop in self.getGroupProperties(group):
-			if not prop.owned or not prop.owner == player: return False
+			if not prop.owner == player: return False
 		return True
 
 	def getRailroadCount(self, player):
 		count = 0
 		for prop in self.getGroupProperties(Group.RAILROAD):
-			if prop.owned and prop.owner == player: count += 1
+			if prop.owner == player: count += 1
 		return count
 
 	def makePayment(self, player1, player2, amount):
@@ -139,15 +119,22 @@ class State:
 		return str(self.toTuple())
 
 class Phase:
-	NO_ACTION = 0
-	TRADE = 1
-	DICE_ROLL = 2
-	BUYING = 3
-	AUCTION = 4
-	PAYMENT = 5
-	JAIL = 6
-	CHANCE_CARD = 7
-	COMMUNITY_CHEST_CARD = 8
+	START_GAME         = 'START_GAME'
+	START_TURN         = 'START_TURN'
+	JAIL               = 'JAIL'
+	DICE_ROLL          = 'DICE_ROLL'
+	CHANCE_CARD        = 'CHANCE_CARD'
+	COMMUNITY_CHEST    = 'COMMUNITY_CHEST'
+	MORTGAGE           = 'MORTGAGE'
+	SELL_HOUSES        = 'SELL_HOUSES'
+	BUY                = 'BUY'
+	BUY_RESULT         = 'BUY_RESULT'
+	AUCTION            = 'AUCTION'
+	TRADE              = 'TRADE'
+	TRADE_RESPONSE     = 'TRADE_RESPONSE'
+	BUY_HOUSES         = 'BUY_HOUSES'
+	END_TURN           = 'END_TURN'
+	END_GAME           = 'END_GAME'
 
 class GameOverException(Exception):
 	pass

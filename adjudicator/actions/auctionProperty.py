@@ -1,55 +1,47 @@
-from actions.action import Action
 from config import log
 from state import Phase
 from utils import check_valid_cash
 
-class AuctionProperty(Action):
+# broadcast call to all live players
+def publish(context):
+	state = context.state
+	context.auctionStarted = False
+	currentPlayerId = state.getCurrentPlayerId()
+	playerPosition = state.getPosition(currentPlayerId)
+	state.setPhasePayload(playerPosition)
 	
-	def publish(self):
-		#auction variables
-		currentPlayerId = self.state.getCurrentPlayerId()
-		self.auctionWinner = currentPlayerId
-		self.winningBid = 1
-		self.livePlayers = self.state.getLivePlayers()
-		self.agentsYetToRespond = list(self.livePlayers)
-		
-		log("auction","Agent "+str(currentPlayerId)+" has decided to auction the property "+str(self.state.getPhasePayload()))
-		self.publishAction(currentPlayerId,"AUCTION_IN")
+	log("auction","Agent {} has decided to auction the property {}".format(currentPlayerId,state.getPhasePayload()))
 	
-	def subscribe(self,*args):
-		agentId = None
-		bid = None
-		if len(args)>0:
-			agentId = args[0]
-		if len(args)>1:
-			bid = args[1]
-		
-		if self.canAccessSubscribe(agentId):
-			bid = check_valid_cash(bid)
-			playerCash = self.state.getCash(agentId)
-			
-			#Only if the player has enough money should his bid be considered valid
-			if bid > self.winningBid and playerCash >= bid:
-				self.auctionWinner = agentId
-				self.winningBid = bid
-			
-			#self.validSubs is updated in self.canAccessSubscribe
-			if self.validSubs >= len(self.livePlayers):
-				log("auction","Agent "+self.auctionWinner+" won the Auction with a bid of "+str(self.winningBid))
-				
-				auctionedProperty = self.state.getPhasePayload()
-				playerCash = self.state.getCash(self.auctionWinner)
-				playerCash -= self.winningBid
-				self.state.setCash(self.auctionWinner,playerCash)
-				self.state.setPropertyOwner(auctionedProperty,self.auctionWinner)   
-				
-				#Receive State
-				phasePayload = [auctionedProperty,self.auctionWinner,self.winningBid]
-				self.state.setPhasePayload(phasePayload)
-				self.context.receiveState.previousAction = "auctionProperty"
-				self.context.receiveState.nextAction = "endTurn"
-				
-				self.context.receiveState.setContext(self.context)
-				self.context.receiveState.publish()
-		else:
-			print("Agent "+str(agentId)+" was not supposed to respond to auctionProperty here.")
+	return list(state.getLivePlayers())
+
+def subscribe(context,reponses):
+	state = context.state
+
+	# the current player wins by default for bid of $1
+	auctionWinner = state.getCurrentPlayerId()
+	winningBid = 1
+
+	for agentId,bid in reponses.items():
+		playerCash = state.getCash(agentId)
+		playerDebt = state.getDebt(agentId)
+		bid = check_valid_cash(bid)
+
+		#Only if the player has enough money should his bid be considered valid
+		# TODO: bids could be the same
+		if bid > winningBid and (playerCash - playerDebt) >= bid:
+			auctionWinner = agentId
+			winningBid = bid
+
+	auctionedProperty = state.getPhasePayload()
+	playerCash = state.getCash(auctionWinner)
+	playerCash -= winningBid
+	state.setCash(auctionWinner,playerCash)
+	state.setPropertyOwner(auctionedProperty,auctionWinner)
+	log("auction","Agent {} won the Auction with a bid of {}".format(auctionWinner,winningBid))
+
+	# phasePayload = [auctionedProperty,auctionWinner,winningBid]
+	# state.setPhasePayload(phasePayload)
+	# return Phase.AUCTION_RESULT
+	
+	state.setPhasePayload(None)
+	return Phase.BUY_HOUSES

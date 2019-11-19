@@ -1,54 +1,56 @@
-from actions.action import Action
 from config import log
+from state import Phase
 from constants import board
+from actions.constants import TOTAL_NO_OF_TURNS
 
-class EndTurn(Action):
+# called for only one agent
+def publish(context):
+	state = context.state
+	handle_payment(context)
 	
-	def publish(self):
-		log("turn","Turn "+str(self.state.getTurn())+" end")
-		self.handle_payment()
-		
-		lossCount = 0
-		for agentId in self.PLAY_ORDER:
-			if self.state.hasPlayerLost(agentId): lossCount+=1
-		
-		if (lossCount>=self.TOTAL_NO_OF_PLAYERS-1) or (self.state.getTurn()+1 >= self.TOTAL_NO_OF_TURNS):
-			#Only one player left or last turn is completed. Winner can be decided.
-			self.context.endGame.setContext(self.context)
-			self.context.endGame.publish()
-		else:
-			currentPlayerId = self.state.getCurrentPlayerId()
-			if self.dice.double and not self.state.hasPlayerLost(currentPlayerId):
-				log("dice","Rolled Doubles. Play again.")
-				self.context.jailDecision.setContext(self.context)
-				self.context.jailDecision.publish()
-			else:
-				if self.isOption(currentPlayerId,"END_TURN"):
-					self.agentsYetToRespond = [currentPlayerId]
-					self.publishAction(currentPlayerId,"END_TURN_IN")
-				else:
-					#no communication with the user here.
-					self.context.startTurn.setContext(self.context)
-					self.context.startTurn.publish()
+	lossCount = 0
+	for agentId in context.PLAY_ORDER:
+		if state.hasPlayerLost(agentId): lossCount+=1
 	
-	def subscribe(self,*args):
-		agentId = None
-		if len(args)>0:
-			agentId = args[0]
-		
-		if agentId and self.canAccessSubscribe(agentId):
-			self.context.startTurn.setContext(self.context)
-			self.context.startTurn.publish()
+	TOTAL_NO_OF_PLAYERS = len(context.PLAY_ORDER)
+	if (lossCount>=TOTAL_NO_OF_PLAYERS-1) or (state.getTurn()+1 >= TOTAL_NO_OF_TURNS):
+		#Only one player left or last turn is completed. Winner can be decided.
+		log("turn","Turn {} end".format(state.getTurn()))
+		return []
+	else :
+		if not context.dice.double:
+			log("turn","Turn {} end".format(state.getTurn()))
+			return [state.getCurrentPlayerId()]
 		else:
-			print("Agent "+str(agentId)+" was not supposed to respond to endTurn here.")
+			# go to JailDecision instead
+			log("turn","Double had been rolled.")
+			return []
 
-	"""
-	Handling payments the player has to make to the bank/opponent
-	Could be invoked for either player during any given turn.
-	Returns 2 boolean list - True if the player was able to pay off his debt
-	"""
-	def handle_payment(self):
-		for playerId in self.PLAY_ORDER:
-			if not self.state.hasPlayerLost(playerId):
-				self.state.clearDebt(playerId)
+def subscribe(context, responses):
+	state = context.state
+	agentId = list(responses.keys())[0]
+
+	lossCount = 0
+	for agentId in context.PLAY_ORDER:
+		if state.hasPlayerLost(agentId): lossCount+=1
+
+	TOTAL_NO_OF_PLAYERS = len(context.PLAY_ORDER)
+	if (lossCount>=TOTAL_NO_OF_PLAYERS-1) or (state.getTurn()+1 >= TOTAL_NO_OF_TURNS):
+		return Phase.END_GAME
+	else:
+		#TODO: should this be cleared?
+		if context.dice.double and not state.hasPlayerLost(agentId):
+			return Phase.JAIL
+		else:
+			return Phase.START_TURN
+
+"""
+Handling payments the player has to make to the bank/opponent
+Could be invoked for either player during any given turn.
+Returns 2 boolean list - True if the player was able to pay off his debt
+"""
+def handle_payment(context):
+	for playerId in context.PLAY_ORDER:
+		if not context.state.hasPlayerLost(playerId):
+			context.state.clearDebt(playerId)
 	

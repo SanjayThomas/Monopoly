@@ -1,4 +1,4 @@
-export const ROUTER_ENDPOINT = "ws://54.185.10.135/ws";
+export const ROUTER_ENDPOINT = "ws://localhost:4000/ws";
 export const APPLICATION_REALM = "realm1";
 
 // action button string

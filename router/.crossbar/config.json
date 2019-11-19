@@ -48,14 +48,14 @@
             },
             "game": {
               "type": "static",
-              "directory": "/app/game",
+              "directory": "/app/game/build",
               "options": {
                 "enable_directory_listing": true
               }
             },
             "sbu_agent": {
               "type": "static",
-              "directory": "/app/build",
+              "directory": "/app/webui/build",
               "options": {
                 "enable_directory_listing": true
               }
