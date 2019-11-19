@@ -1,6 +1,7 @@
 FROM crossbario/autobahn-python:cpy3
 
 RUN pip install --upgrade autobahn
+RUN pip install --upgrade requests
 RUN pip install --upgrade google-auth
 RUN pip install --upgrade PyMySQL
 RUN pip install --upgrade PyYAML

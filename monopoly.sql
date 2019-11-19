@@ -1,5 +1,9 @@
 SET GLOBAL event_scheduler = ON;
 
+USE mysql;
+CREATE USER 'root'@'%' IDENTIFIED BY 'root123';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+
 DROP DATABASE IF EXISTS monopoly;
 CREATE DATABASE monopoly;
 
