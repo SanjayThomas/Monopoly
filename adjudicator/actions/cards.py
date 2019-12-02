@@ -28,8 +28,7 @@ def subscribe(context,responses):
 	state = context.state
 	agentId = list(responses.keys())[0]
 	cardId = state.getPhasePayload()
-	currentPhase = state.getPhase()
-	if currentPhase == Phase.CHANCE_CARD:
+	if state.getPhase() == Phase.CHANCE_CARD:
 		card = chanceCards[cardId]
 		deck = "chance"
 	else:
@@ -46,7 +45,6 @@ def handle_cards_pre_turn(context,card,deck):
 	state = context.state
 	currentPlayerId = state.getCurrentPlayerId()
 	playerPosition = state.getPosition(currentPlayerId)
-	playerCash = state.getCash(currentPlayerId)
 	updateState = False
 	
 	if card['type'] == 1:
@@ -54,19 +52,19 @@ def handle_cards_pre_turn(context,card,deck):
 		if card['money']<0:
 			state.addDebt(currentPlayerId,abs(card['money']))
 		else:
-			playerCash += abs(card['money'])
+			state.addCash(currentPlayerId,abs(card['money']))
 
 	elif card['type'] == 2:
 		#-ve represents you need to pay
-		debt = abs(card['money'])
 		for playerId in state.getLivePlayers():
 			if playerId!=currentPlayerId:
 				if card['money']<0:
-					state.addDebt(currentPlayerId,debt)
-					state.setCash(playerId,state.getCash(playerId) + debt)
+					# TODO: not sure how to handle case where currentPlayerId goes bankrupt with debt against multiple players
+					# temp workaround: pay the other agents and add debt as from bank for currentPlayerId
+					state.addCash(playerId,abs(card['money']))
+					state.addDebt(currentPlayerId,abs(card['money']))
 				else:
-					state.addDebt(playerId,debt)
-					state.setCash(currentPlayerId,state.getCash(currentPlayerId) + debt)
+					state.addDebt(playerId,abs(card['money']),currentPlayerId)
 		
 	elif card['type'] == 3:
 		if card['position'] == JAIL:
@@ -75,7 +73,7 @@ def handle_cards_pre_turn(context,card,deck):
 		
 		if (card['position'] - 1) < playerPosition:
 			#Passes Go
-			playerCash += PASSING_GO_MONEY
+			state.addCash(currentPlayerId,PASSING_GO_MONEY)
 		playerPosition = card['position'] - 1
 		updateState = True
 			
@@ -107,7 +105,7 @@ def handle_cards_pre_turn(context,card,deck):
 		if (playerPosition < 5) or (playerPosition>=35):
 			if (playerPosition>=35):
 				#Passes Go
-				playerCash += PASSING_GO_MONEY
+				state.addCash(currentPlayerId,PASSING_GO_MONEY)
 			playerPosition = 5
 		elif (playerPosition < 15) and (playerPosition>=5):
 			playerPosition = 15
@@ -123,19 +121,18 @@ def handle_cards_pre_turn(context,card,deck):
 		if (playerPosition < 12) or (playerPosition>=28):
 			if (playerPosition>=28):
 				#Passes Go
-				playerCash += PASSING_GO_MONEY
+				state.addCash(currentPlayerId,PASSING_GO_MONEY)
 			playerPosition = 12
 		elif (playerPosition < 28) and (playerPosition>=12):
 			playerPosition = 28
 		
-		isPropertyOwned = state.isPropertyOwned(playerPosition)
-		isRightOwner = state.rightOwner(currentPlayerId,playerPosition)
+		ownerId = state.getPropertyOwner(playerPosition)
 		isPropertyMortgaged = state.isPropertyMortgaged(playerPosition)
-		if isPropertyOwned and not isRightOwner and not isPropertyMortgaged:
+		if (ownerId != currentPlayerId) and not isPropertyMortgaged:
 			#Check if owned by opponent
 			#TODO: Debug dice
 			context.dice.roll(ignore=True)
-			state.addDebt(currentPlayerId,10 * (context.dice.die_1 + context.dice.die_2))
+			state.addDebt(currentPlayerId,10 * (context.dice.die_1 + context.dice.die_2),ownerId)
 	
 	elif card['type'] == 8:
 		#Go back 3 spaces
@@ -146,7 +143,6 @@ def handle_cards_pre_turn(context,card,deck):
 	
 	# playerPosition != JAIL
 	state.setPosition(currentPlayerId,playerPosition)
-	state.setCash(currentPlayerId,playerCash)
 
 	if not updateState:
 		return Phase.MORTGAGE
@@ -160,17 +156,15 @@ Determines the effect of the position and action required from the player.
 def determine_position_effect(state,dice):
 	currentPlayerId = state.getCurrentPlayerId()
 	playerPosition = state.getPosition(currentPlayerId)
-	playerCash = state.getCash(currentPlayerId)
 	propertyClass = board[playerPosition]['class']
 	
 	if propertyClass == 'Street' or propertyClass == 'Railroad' or propertyClass == 'Utility':
-		isPropertyOwned = state.isPropertyOwned(playerPosition)
-		isRightOwner = state.rightOwner(currentPlayerId,playerPosition)
+		ownerId = state.getPropertyOwner(playerPosition)
 		isPropertyMortgaged = state.isPropertyMortgaged(playerPosition)
 		
-		if isPropertyOwned and not isRightOwner and not isPropertyMortgaged:
+		if (ownerId != currentPlayerId) and not isPropertyMortgaged:
 			rent = calculateRent(state,dice)
-			state.addDebt(currentPlayerId,rent)
+			state.addDebt(currentPlayerId,rent,ownerId)
 		
 		return Phase.MORTGAGE
 		

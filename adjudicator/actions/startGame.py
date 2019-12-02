@@ -14,23 +14,23 @@ def publish(context):
 	context.chance = Cards(chanceCards)
 	
 	if context.INITIAL_STATE == "DEFAULT":
-		context.state =  State(context.PLAY_ORDER)
+		context.state =  State(context.state.players)
 	elif context.INITIAL_STATE == "TEST_BUY_HOUSES":
 		properties = [Property(0,False,False,0,i) for i in range(NUMBER_OF_PROPERTIES)]
-		agentOne = context.PLAY_ORDER[0]
+		agentOne = context.state.players[0]
 		properties[6].ownerId = agentOne
 		properties[8].ownerId = agentOne
 		properties[9].ownerId = agentOne
-		agentTwo = context.PLAY_ORDER[1]
+		agentTwo = context.state.players[1]
 		properties[11].ownerId = agentTwo
 		properties[13].ownerId = agentTwo
 		properties[14].ownerId = agentTwo
-		context.state = State(context.PLAY_ORDER,properties)
+		context.state = State(context.state.players,properties)
 		
 	log("game","Game #"+str(context.gamesCompleted+1)+" started.")
 	
 	# all the agents provided can access the startGame API
-	return context.PLAY_ORDER
+	return context.state.players
 
 # should return the phase that follows the current one
 def subscribe(context, responses):

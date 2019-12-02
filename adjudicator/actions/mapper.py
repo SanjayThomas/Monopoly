@@ -26,11 +26,11 @@ class Mapper:
 		isBroadcast = phaseToClass[self.currentPhase]['broadcast']
 		if isBroadcast:
 			if (self.currentPhase == Phase.START_GAME) or (self.currentPhase == Phase.END_GAME):
-				self.agentsYetToRespond = list(context.PLAY_ORDER)
+				self.agentsYetToRespond = list(context.state.players)
 			else:
 				self.agentsYetToRespond = list(context.state.getLivePlayers())
 		else:
-			if (self.currentPhase == Phase.BUY_HOUSES) or (self.currentPhase == Phase.SELL_HOUSES) or (self.currentPhase == Phase.MORTGAGE) or (self.currentPhase == Phase.TRADE):
+			if (self.currentPhase == Phase.BUY_HOUSES) or (self.currentPhase == Phase.SELL_HOUSES) or (self.currentPhase == Phase.MORTGAGE) or (self.currentPhase == Phase.UNMORTGAGE) or (self.currentPhase == Phase.TRADE):
 				self.agentsYetToRespond = [context.bsmAgentId]
 			elif (self.currentPhase == Phase.TRADE_RESPONSE):
 				self.agentsYetToRespond = [context.tradeReceiver]

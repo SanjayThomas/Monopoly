@@ -17,9 +17,9 @@ from math import floor
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-GAMEID_LENGTH = 48
-SESSIONID_LENGTH = 48
-GAME_EXPIRE_TIME = 300
+GAMEID_LENGTH = 16
+SESSIONID_LENGTH = 16
+GAME_EXPIRE_TIME = 600
 
 class GameGen(ApplicationSession):
     
@@ -345,23 +345,20 @@ class GameGen(ApplicationSession):
                 expireTime = floor(resSet['createTime'] + GAME_EXPIRE_TIME - time())
 
                 if resSet['tourType'] == 0:
-                    jSql = """SELECT u.email,ug.agentId,ug.winCount
+                    jSql = """SELECT u.email,ug.winCount
                             FROM user u JOIN user_sologame ug
                             ON u.id = ug.userId WHERE ug.tourId=%s"""
                 else:
-                    jSql = """SELECT u.email,ug.agentId
+                    jSql = """SELECT u.email
                             FROM user u JOIN user_tour ug
                             ON u.id = ug.userId WHERE ug.tourId=%s"""
 
                 cursor.execute(jSql, (resSet['id'],))
                 userSet = cursor.fetchall()
 
-                currentAgentId = None
                 jPlayers = []
                 if userSet is not None:
                     for user in userSet:
-                        if email == user['email']:
-                            currentAgentId = user['agentId']
                         if 'winCount' in user:
                             jPlayers.append([user['email'],user['winCount']])
                         else:
@@ -380,9 +377,6 @@ class GameGen(ApplicationSession):
                 }
                 if resSet['tourType'] > 0:
                     result['noPpg'] = resSet['noPpg']
-
-                if currentAgentId is not None:
-                    result['currentAgentId'] = currentAgentId
 
                 if resSet['winUserId'] is not None:
                     cursor.execute(uSql, (resSet['winUserId'],))

@@ -28,16 +28,15 @@ def subscribe(context, responses):
 	if validateSellingSequence(sellingSequence) and state.isSellingSequenceValid(agentId,sellingSequence):
 		log("game","The selling sequence for agent {} is valid.".format(agentId))
 		# handle selling
-		playerCash = state.getCash(agentId)
-	
+		cash = 0
 		for propertyId,houses in sellingSequence:
 			space = board[propertyId]
 			houseCount = state.getNumberOfHouses(propertyId)
 			houseCount -= houses
-			playerCash += int(space['build_cost']*0.5*houses)
+			cash += int(space['build_cost']*0.5*houses)
 			state.setNumberOfHouses(propertyId,houseCount)
 		
-		state.setCash(agentId,playerCash)
+		state.addCash(agentId,cash)
 
 	return Phase.TRADE
 

@@ -37,8 +37,8 @@ from twisted.internet.defer import inlineCallbacks
 from autobahn.twisted.wamp import ApplicationSession, ApplicationRunner
 
 """CONFIGURATION SETTINGS"""
-# will wait 5 min for all players to join
-TIMEOUT = 310
+# will wait seconds represented by TIMEOUT for all players to join
+TIMEOUT = 610
 
 class Adjudicator(ApplicationSession):
     
@@ -123,6 +123,11 @@ class Adjudicator(ApplicationSession):
                 'subscribe' : actions.mortgage.subscribe,
                 'broadcast' : False # TODO
             },
+            Phase.UNMORTGAGE           : {
+                'publish'   : actions.mortgage.publish,
+                'subscribe' : actions.mortgage.subscribe,
+                'broadcast' : False # TODO
+            },
             Phase.SELL_HOUSES        : {
                 'publish'   : actions.sellHouses.publish,
                 'subscribe' : actions.sellHouses.subscribe,
@@ -195,10 +200,10 @@ class Adjudicator(ApplicationSession):
         self.gameIndex = res['id']
 
     def logger(self,msg):
-        # print(msg)
-        # with open("newAdjudicator_{}.log".format(self.gameId), "a") as f:
+        print(msg)
+        #with open("newAdjudicator_{}.log".format(self.gameId), "a") as f:
         #    f.write(msg+"\n")
-        pass
+        #pass
 
     def timeoutHandler(self):
         self.logger('In joingame timeoutHandler')
@@ -212,15 +217,15 @@ class Adjudicator(ApplicationSession):
     # called by agent to join this game.
     # argument is sessionId
     def joinGame(self,*args):
-        ERROR = "ERROR"
+        ERROR = "Implementation error. Please contact admins."
 
         try:
             sessionId = args[0]
         except:
-            return ERROR
+            return [1,"Please provide your current sessionId from the WebUI as argument while joining a game."]
 
         if not (isinstance(sessionId,str) and match('^[a-zA-Z0-9]+$',sessionId)):
-            return ERROR
+            return [1,"The provided sessionId had an invalid format."]
 
         agentOptions = deepcopy(self.agentDefaultOptions)
         if len(args) > 1 and isinstance(args[1],dict):
@@ -228,26 +233,25 @@ class Adjudicator(ApplicationSession):
                 if key in agentOptions:
                     agentOptions[key] = value
 
-        if sessionId in self.agents:
-            # the agent had already joined this game.
+        sql = "SELECT id,email FROM user WHERE sessionId=%s"
+        payload = (sessionId,)
+        creds = self.singleQuery(sql,payload)
+        if creds is None:
+            return [1,"The given sessionId doesn't exist in the store. Please try refreshing the page to renew the session."]
+
+        if creds['email'] in self.agents:
             # TODO: send him to the correct point in the game
             self.logger("Agent was already in the game")
-            return sessionId
+            self.agents[creds['email']]['sessionId'] = sessionId
+            return [0,creds['email']]
         elif len(self.agents) < self.noPlayers:
-            sql = "SELECT id,email FROM user WHERE sessionId=%s"
-            payload = (sessionId,)
-            creds = self.singleQuery(sql,payload)
-            if creds is None:
-                return ERROR
-            self.logger("Agent with ID: {} has joined the game".format(sessionId))
-            
-            if not self.addUser(self.gameId, creds['id'],sessionId):
+            if not self.addUser(self.gameId, creds['id']):
                self.logger("addUser SQL query failed")
-               return False
+               return [1,ERROR]
 
-            self.agents[sessionId] = {
+            self.agents[creds['email']] = {
                 'id': creds['id'],
-                'email': creds['email'],
+                'sessionId': sessionId,
                 'agentOptions': agentOptions,
                 'wins': 0,
                 'subKeys': []
@@ -255,12 +259,12 @@ class Adjudicator(ApplicationSession):
             self.logger("{} agents have joinedout of {}".format(len(self.agents),self.noPlayers))
             if len(self.agents) == self.noPlayers:
                 self.startGame()
-            # The name used to identify the player during the game
+            
             self.logger("Player {} has joined the game.".format(creds['email']))
-            return sessionId
+            return [0,creds['email']]
         
         # can't join anymore
-        return ERROR
+        return [1,"The game is full. Sorry."]
 
     def singleQuery(self, sql, payload, commit=False):
         # SQL Connection
@@ -284,7 +288,7 @@ class Adjudicator(ApplicationSession):
 
         return res
 
-    def addUser(self, gameId, userId, agentId):
+    def addUser(self, gameId, userId):
         res = True
         connection = pymysql.connect(host=self.mysql_host,
                              port=3306,
@@ -296,8 +300,8 @@ class Adjudicator(ApplicationSession):
         try:
             with connection.cursor() as cursor:
                 # Create a new record
-                sql = "INSERT INTO user_sologame (userId,tourId,agentId) VALUES (%s,%s,%s)"
-                cursor.execute(sql, (userId,self.gameIndex,agentId))
+                sql = "INSERT INTO user_sologame (userId,tourId) VALUES (%s,%s)"
+                cursor.execute(sql, (userId,self.gameIndex))
             connection.commit()
         except Exception as e:
             self.logger("SQL SELECT/INSERT in addUser failed.")
@@ -333,17 +337,21 @@ class Adjudicator(ApplicationSession):
             self.singleQuery(sql,payload,commit=True)
 
             payload = [1,self.gameId]
-            yield self.publish('com.game{}.uiupdates'.format(self.gameId), payload)  
+            yield self.publish('com.game{}.uiupdates'.format(self.gameId), payload)
+        elif args['type'] == 2:
+            sql = "UPDATE tournament SET status=2 WHERE tourUID=%s"
+            payload = (self.gameId,)
+            self.singleQuery(sql,payload,commit=True)
+
+            payload = [2,self.gameId]
+            yield self.publish('com.game{}.uiupdates'.format(self.gameId), payload)
     
     def shutDown(self):
         for _,data in self.agents.items():
             for subKey in data['subKeys']:
                 subKey.unsubscribe()
 
-        sql = "UPDATE tournament SET status=2 WHERE tourUID=%s"
-        payload = (self.gameId,)
-        self.singleQuery(sql,payload,commit=True)
-
+        self.uiUpdateChannel({'type':2})
         self.leave()
     
     # called after we call self.leave()
@@ -363,14 +371,14 @@ class Adjudicator(ApplicationSession):
         self.uiUpdateChannel({'type':1})
 
         self.gamesCompleted = 0
-        self.PLAY_ORDER = list(self.agents.keys())
-        shuffle(self.PLAY_ORDER)
+        PLAY_ORDER = list(self.agents.keys())
+        shuffle(PLAY_ORDER)
         
         self.winner = None
         self.dice = Dice()
         self.chest = Cards(communityChestCards)
         self.chance = Cards(chanceCards)
-        self.state =  State(self.PLAY_ORDER)
+        self.state =  State(PLAY_ORDER)
         self.mortgagedDuringTrade = []
 
         # used during JailDecision
@@ -378,13 +386,13 @@ class Adjudicator(ApplicationSession):
 
         # used with Phase.BUY to decide which agent MORTGAGE & SELL_HOUSES
         # should be called for
-        self.bsmAgentId = self.PLAY_ORDER[0]
+        self.bsmAgentId = PLAY_ORDER[0]
         self.auctionStarted = False
         self.tradeCounter = 0
 
         self.mapper = Mapper(self)
 
-        for agentId in self.PLAY_ORDER:
+        for agentId in PLAY_ORDER:
             uri = self.endpoints['RESPONSE'].format(self.gameId, agentId)
             sub = yield self.subscribe(partial(self.mapper.response,agentId), uri)
             self.agents[agentId]['subKeys'].append(sub)

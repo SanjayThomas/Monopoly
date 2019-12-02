@@ -28,7 +28,7 @@ def subscribe(context,responses):
 		# continue trades for the same agent
 		return Phase.TRADE
 
-	noPlayers = len(context.PLAY_ORDER)
+	noPlayers = len(context.state.players)
 	nextIndex = (state.getPlayerIndex(agentId) + 1) % noPlayers
 	nextAgentId = state.getPlayerId(nextIndex)
 	currentAgentId = state.getCurrentPlayerId()
@@ -45,7 +45,7 @@ def subscribe(context,responses):
 		# trading is done for all agents in this turn
 		if context.auctionStarted:
 			return Phase.AUCTION
-		return Phase.BUY_HOUSES
+		return Phase.UNMORTGAGE
 	
 	# do mortgage, selling and trade for the next agent
 	return Phase.MORTGAGE
@@ -69,14 +69,13 @@ def processTradeSuccess(context,agentId):
 	# here, otherAgentId is the player who proposed the trade
 	otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest = state.getPhasePayload()
 	
-	proposerCash =  state.getCash(agentId)
-	receiverCash = state.getCash(otherAgentId)
-
-	proposerCash += (cashRequest - cashOffer)
-	receiverCash += (cashOffer - cashRequest)
-	
-	state.setCash(agentId,proposerCash)
-	state.setCash(otherAgentId,receiverCash)
+	# trade could be to escape debt where we need to clear debt accordingly
+	if cashRequest > cashOffer:
+		state.addCash(agentId,cashRequest - cashOffer)
+		state.addDebt(otherAgentId,cashRequest - cashOffer)
+	else:
+		state.addDebt(agentId,cashOffer - cashRequest)
+		state.addCash(otherAgentId,cashOffer - cashRequest)
 
 	for propertyRequest in propertiesRequest:
 		state.setPropertyOwner(propertyRequest,agentId)
@@ -93,8 +92,8 @@ def processTradeSuccess(context,agentId):
 			mortgagedPrice = int(propertyPrice/2)
 			agentInQuestion = state.getPropertyOwner(mortgagedProperty)
 
-			agentsCash = state.getCash(agentInQuestion)
-			agentsCash -= int(mortgagedPrice*0.1)
-			state.setCash(agentInQuestion,agentsCash)
+			# TODO: could this be done better?
+			# We're not checking in handleTrade if the agent has enough cash for this
+			state.addDebt(agentId,int(mortgagedPrice*0.1))
 
 	log("game","Trade request from agent {} to {} was a success!".format(agentId, otherAgentId))

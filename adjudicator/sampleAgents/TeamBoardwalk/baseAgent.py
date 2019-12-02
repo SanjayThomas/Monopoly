@@ -6,6 +6,7 @@ from os import environ
 
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
+from autobahn.wamp.types import PublishOptions, SubscribeOptions
 from autobahn.twisted.wamp import ApplicationSession, ApplicationRunner
 
 @six.add_metaclass(abc.ABCMeta)
@@ -29,11 +30,12 @@ class BaseAgent(ApplicationSession):
 		print("Use this ID instead of your session ID to join this game if you get disconnected")
 		print("This is a workaround to join the game again since the session ID could timeout.")
 		print("Thus, run your agent as: python agent.py <game ID> <agent ID>")
-		self.id = res
-
-		if self.id == "ERROR":
+		if res[0] == 1:
+			print("The following error occurred.")
+			print(res[1])
 			self.leave()
 
+		self.id = res[1]
 		self.endpoints = {
 			'REQUEST'   : 'monopoly.game{}.agent{}.request',
 			'RESPONSE'  : 'monopoly.game{}.agent{}.response'
@@ -46,6 +48,7 @@ class BaseAgent(ApplicationSession):
 			'BUY_RESULT'         : self.buyResult,
 			'AUCTION'            : self.auctionProperty,
 			'MORTGAGE'           : self.mortgage,
+			'UNMORTGAGE'         : self.unmortgage,
 			'SELL_HOUSES'        : self.sellHouses,
 			'TRADE'              : self.getTradeDecision,
 			'TRADE_RESPONSE'     : self.respondTrade,
@@ -66,7 +69,7 @@ class BaseAgent(ApplicationSession):
 		}
 		
 		uri = self.endpoints['REQUEST'].format(self.gameId, self.id)
-		self.requestId = yield self.subscribe(self.mapper, uri)
+		self.requestId = yield self.subscribe(self.mapper, uri, options=SubscribeOptions(get_retained=True))
 
 		print("Successfully registered!")
 	
@@ -81,7 +84,7 @@ class BaseAgent(ApplicationSession):
 		if phase in self.phaseToMethod:
 			result = self.phaseToMethod[phase](state)
 		uri = self.endpoints['RESPONSE'].format(self.gameId, self.id)
-		self.publish(uri, phase, result)
+		self.publish(uri, phase, result, options=PublishOptions(acknowledge=True,retain=True))
 
 		if phase == "END_GAME" and isinstance(jsonState['phase_payload'], dict):
 			#The last game has completed
@@ -148,7 +151,7 @@ class BaseAgent(ApplicationSession):
 	@abc.abstractmethod
 	def mortgage(self, state):
 		"""
-		Mortgage/Unmortgage properties
+		Mortgage properties
 		"""
 	
 	@abc.abstractmethod
@@ -167,6 +170,12 @@ class BaseAgent(ApplicationSession):
 	def respondTrade(self, state):
 		"""
 		Add code for responding to trades here.
+		"""
+
+	@abc.abstractmethod
+	def unmortgage(self, state):
+		"""
+		Unmortgage properties
 		"""
 	
 	@abc.abstractmethod

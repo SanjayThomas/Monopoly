@@ -9,10 +9,9 @@ from twisted.internet import reactor
 def publish(context):
     log("game","Game #{} has ended.".format(context.gamesCompleted+1))
     
-    resultsArray = final_winning_condition(context)
-    log("win","Agents {} won the Game.".format(resultsArray))
+    winners = final_winning_condition(context)
+    log("win","Agents {} won the Game.".format(winners))
     
-    winners = resultsArray
     for winner in winners:
         context.agents[winner]['wins']+=1
     #Allow the agent to make changes based on current game results
@@ -29,7 +28,7 @@ def publish(context):
             winCount[agentId] = data['wins']
         context.state.setPhasePayload(winCount)
 
-    return context.PLAY_ORDER
+    return context.state.players
 
 def subscribe(context,responses):
     if context.gamesCompleted < context.noGames:
@@ -39,7 +38,7 @@ def subscribe(context,responses):
         # ceil should ensure shuffleFactor > 0
         shuffleFactor = ceil(context.noGames/context.noPlayers)
         if context.gamesCompleted % shuffleFactor == 0:
-            context.PLAY_ORDER.append(context.PLAY_ORDER.pop(0))
+            context.state.players.append(context.state.players.pop(0))
 
         return Phase.START_GAME
     
@@ -58,7 +57,7 @@ def final_winning_condition(context):
     agentPropertyWorth = {}
     state = context.state
     
-    for playerId in context.PLAY_ORDER:
+    for playerId in context.state.players:
         agentCash[playerId] = state.getCash(playerId)
         agentPropertyWorth[playerId] = 0
     
@@ -87,7 +86,7 @@ def final_winning_condition(context):
     #Using an array here to handle ties
     winners = []
     highestAssets = 0
-    for playerId in context.PLAY_ORDER:
+    for playerId in context.state.players:
         turn_of_loss = state.getTurnOfLoss(playerId)
         if turn_of_loss==-1:
             log("win_condition","Agent {} Cash: {}".format(playerId,agentCash[playerId]))
@@ -104,7 +103,7 @@ def final_winning_condition(context):
     # very rare occurence where multiple people lost in last turn
     if len(winners) == 0:
         highestTurnOfLoss = -1
-        for playerId in context.PLAY_ORDER:
+        for playerId in context.state.players:
             turn_of_loss = state.getTurnOfLoss(playerId)
             if turn_of_loss > highestTurnOfLoss:
                 highestTurnOfLoss = turn_of_loss

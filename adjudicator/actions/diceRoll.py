@@ -10,7 +10,6 @@ def publish(context):
 	dice = context.dice
 	currentPlayerId = state.getCurrentPlayerId()
 	playerPosition = state.getPosition(currentPlayerId)
-	playerCash = state.getCash(currentPlayerId)
 	
 	log("game","Agent {} about to throw dice.".format(currentPlayerId))
 	
@@ -28,9 +27,8 @@ def publish(context):
 		#Passing Go
 		if playerPosition>=BOARD_SIZE:
 			playerPosition = playerPosition % BOARD_SIZE
-			playerCash += PASSING_GO_MONEY
+			state.addCash(currentPlayerId,PASSING_GO_MONEY)
 		
-		state.setCash(currentPlayerId,playerCash)
 		state.setPosition(currentPlayerId,playerPosition)
 	
 	currentPhase = state.getPhase()
@@ -56,17 +54,15 @@ Determines the effect of the position and action required from the player.
 def determine_position_effect(state,dice):
 	currentPlayerId = state.getCurrentPlayerId()
 	playerPosition = state.getPosition(currentPlayerId)
-	playerCash = state.getCash(currentPlayerId)
 	propertyClass = board[playerPosition]['class']
 	
 	if propertyClass == 'Street' or propertyClass == 'Railroad' or propertyClass == 'Utility':
-		isPropertyOwned = state.isPropertyOwned(playerPosition)
-		isRightOwner = state.rightOwner(currentPlayerId,playerPosition)
+		ownerId = state.getPropertyOwner(playerPosition)
 		isPropertyMortgaged = state.isPropertyMortgaged(playerPosition)
 		
-		if isPropertyOwned and not isRightOwner and not isPropertyMortgaged:
+		if (ownerId != currentPlayerId) and not isPropertyMortgaged:
 			rent = calculateRent(state,dice)
-			state.addDebt(currentPlayerId,rent)
+			state.addDebt(currentPlayerId,rent,ownerId)
 		
 		return Phase.MORTGAGE
 		
@@ -82,8 +78,7 @@ def determine_position_effect(state,dice):
 		send_player_to_jail(state,dice)
 		return Phase.END_TURN
 	elif propertyClass == 'Jail':
-		# if player is jail, should they get BSM?
-		# need to make sure player sent to jail in publish doesn't get BSM then
+		# this should only happen if player was sent to jail for getting 3 doubles
 		return Phase.END_TURN
 	
 	#Represents Go,Jail(Visiting),Free Parking

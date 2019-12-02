@@ -1,10 +1,8 @@
 import random
-from collections import namedtuple,OrderedDict
+from collections import OrderedDict
 from constants import board
 import json
 from copy import deepcopy
-
-StateTuple = namedtuple("StateTuple", "turnNumber properties positions money bankrupt phase phaseData debt")
 
 INITIAL_CASH = 1500
 MAX_HOUSES = 32
@@ -40,21 +38,19 @@ class State:
 		self.bankrupt = {}
 		self.phase = Phase.START_GAME
 		self.phasePayload = None
-		self.debt = {}
 		
 		self.jailCounter = {}
-		self.timeoutTracker = {}
 		self.reason_for_loss = {}
 		self.turn_of_loss = {}
+		self.creditor = {}
 		for playerId in self.players:
 			self.positions[playerId] = 0
 			self.cash[playerId] = INITIAL_CASH
 			self.bankrupt[playerId] = False
 			self.jailCounter[playerId] = 0
-			self.timeoutTracker[playerId] = False
 			self.reason_for_loss[playerId] = None
 			self.turn_of_loss[playerId] = -1
-			self.debt[playerId] = 0
+			self.creditor[playerId] = None
 	
 	"""The index of the player in the players array"""
 	"""This represents the order of play for the player"""
@@ -99,6 +95,40 @@ class State:
 		
 	def setCash(self,playerId,cash):
 		self.cash[playerId] = cash
+
+	# only call if playerId gets cash from bank
+	def addCash(self,playerId,cash):
+		# pay debts if any
+		if self.creditor[playerId] is not None:
+			if abs(self.cash[playerId]) > cash:
+				# some debt remains
+				self.cash[self.creditor[playerId]] += cash
+			else:
+				# debt cleared
+				self.cash[self.creditor[playerId]] += abs(self.cash[playerId])
+				self.creditor[playerId] = None
+
+		self.cash[playerId] += cash
+
+	def addDebt(self,playerId,cash,creditor=None):
+		# playerId owes cash to creditor
+		if creditor is not None:
+			if self.cash[playerId] - cash < 0:
+				# give all available cash to the creditor
+				# playerId's cash would now be -ve.
+				# this represents the cash they owe to creditor
+				self.creditor[playerId] = creditor
+				self.addCash(creditor,self.cash[playerId])
+			else:
+				self.addCash(creditor,cash)
+			
+		self.cash[playerId]-=cash
+
+	def clearDebts(self):
+		for playerId in self.getLivePlayers():
+			# TODO: redistribution of properties
+			if self.getCash(playerId) < 0:
+				self.markPlayerLost(playerId, Reason.BANKRUPT)
 	
 	"""BANKRUPT"""
 	def hasPlayerLost(self,playerId):
@@ -107,8 +137,6 @@ class State:
 	def markPlayerLost(self,playerId,reason):
 		self.bankrupt[playerId] = True
 		self.reason_for_loss[playerId] = reason
-		if reason==Reason.TIMEOUT:
-			self.timeoutTracker[playerId]=True
 		self.turn_of_loss[playerId] = self.turnNumber
 	
 	def getTurnOfLoss(self,playerId):
@@ -127,23 +155,6 @@ class State:
 		
 	def setPhasePayload(self,phasePayload):
 		self.phasePayload = phasePayload
-
-	"""DEBT"""
-	def getDebt(self,playerId):
-		return self.debt[playerId]
-	
-	def addDebt(self,playerId,amount):
-		self.debt[playerId] += amount
-	
-	def clearDebt(self,playerId):
-		playerCash = self.getCash(playerId)
-		debt = self.getDebt(playerId)
-		if playerCash >= debt:
-			self.setCash(playerId, playerCash - debt)
-			self.debt[playerId] = 0
-		else:
-			#Unpaid debt to the bank
-			self.markPlayerLost(playerId, Reason.BANKRUPT)
 		
 	"""JAIL COUNTER"""
 	def getJailCounter(self,playerId):
@@ -333,8 +344,7 @@ class State:
 					("player_cash",self.cash),
 					("player_loss_status", self.bankrupt),
 					("phase", self.phase),
-					("phase_payload", self.phasePayload),
-					("player_debts", self.debt) ])
+					("phase_payload", self.phasePayload)])
 	
 	def toJson(self):
 		return json.dumps(self.toDict())
@@ -354,6 +364,7 @@ class Phase:
 	CHANCE_CARD        = 'CHANCE_CARD' # optional, which chance card was drawn
 	COMMUNITY_CHEST    = 'COMMUNITY_CHEST' # optional
 	MORTGAGE           = 'MORTGAGE'
+	UNMORTGAGE         = 'UNMORTGAGE'
 	
 	MORTGAGE_RESULT    = 'MORTGAGE_RESULT' # optional,returns tuple of booleans saying which requests were successful
 	

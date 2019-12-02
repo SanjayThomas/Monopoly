@@ -18,7 +18,7 @@ class RiskyAgent(BaseAgent):
 	def mortgage(self,state):
 		state = State(state)
 		print("Inside mortgage Listener")
-		if state.money[self.pid] - state.debt[self.pid] < 0:
+		if state.money[self.pid] < 0:
 			return self.getBestMortgageAction(state, [])
 		if state.money[self.pid] < self.getSafeMoney(state):
 			return self.getBestMortgageAction(state, state.getOwnedGroupProperties(self.pid))
@@ -28,6 +28,14 @@ class RiskyAgent(BaseAgent):
 			cost = len(groupProps) * groupProps[0].data.houseCost
 			if state.money[self.pid] < self.getSafeMoney(state) + cost:
 				return self.getBestMortgageAction(state, state.getOwnedGroupProperties(self.pid))
+		return None
+
+	def unmortgage(self, state):
+		state = State(state)
+		print("Inside unmortgage Listener")
+		bestGroup = self.getBestGroupToImprove(state)
+		if bestGroup:
+			groupProps = state.getGroupProperties(bestGroup)
 			for prop in groupProps:
 				if prop.mortgaged:
 					return [prop.id]
@@ -36,7 +44,7 @@ class RiskyAgent(BaseAgent):
 	def sellHouses(self,state):
 		state = State(state)
 		print("Inside sellHouses Listener")
-		if state.money[self.pid] - state.debt[self.pid] < 0:
+		if state.money[self.pid] < 0:
 			return self.getBestSellingAction(state)
 		return None
 	
@@ -137,11 +145,15 @@ class RiskyAgent(BaseAgent):
 		return None
 	  
 	def endGame(self,winner):
-		if isinstance(winner, dict):
+		state = State(state)
+		if isinstance(state.phaseData, dict):
 			print("Total Stats:")
-			print(winner)
+			print(state.phaseData)
 		else:
-			print("************* The winner is player {} *************".format(winner))
+			if len(state.phaseData) == 1:
+				print("************* The winner is player {} *************".format(state.phaseData[0]))
+			else:
+				print("************* The winners are {} *************".format(state.phaseData))
 
 	def getExpectedRent(self, prop, houses, turn):
 		data = prop.data
@@ -213,7 +225,8 @@ if __name__ == '__main__':
 	if len(sys.argv) < 3:
 		sys.exit("Not enough arguments")
 	
-	url = environ.get("CBURL", u"ws://127.0.0.1:4000/ws")
+	url = environ.get("CBURL", u"ws://localhost:4000/ws")
+	#url = environ.get("CBURL", u"ws://localhost/ws")
 	if six.PY2 and type(url) == six.binary_type:
 		url = url.decode('utf8')
 	realm = environ.get('CBREALM', u'realm1')

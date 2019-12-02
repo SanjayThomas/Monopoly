@@ -38,7 +38,7 @@ def subscribe(context, responses):
 			state.setNumberOfHouses(propertyId,houseCount)
 		state.setCash(agentId,playerCash)
 	
-	noPlayers = len(context.PLAY_ORDER)
+	noPlayers = len(context.state.players)
 	nextIndex = (state.getPlayerIndex(agentId) + 1) % noPlayers
 	nextAgentId = state.getPlayerId(nextIndex)
 	currentAgentId = state.getCurrentPlayerId()
@@ -48,8 +48,8 @@ def subscribe(context, responses):
 		# buying houses is done for all agents in this turn
 		return Phase.END_TURN
 	
-	# do buying houses for the next agent
-	return Phase.BUY_HOUSES
+	# do unmortgage for the next agent
+	return Phase.UNMORTGAGE
 
 def canBuyHouses(state, agentId):
 	leastPrice = 201

@@ -32,7 +32,7 @@ def subscribe(context,responses):
 		# continue trades for the same agent
 		return Phase.TRADE
 
-	noPlayers = len(context.PLAY_ORDER)
+	noPlayers = len(context.state.players)
 	nextIndex = (state.getPlayerIndex(agentId) + 1) % noPlayers
 	nextAgentId = state.getPlayerId(nextIndex)
 	currentAgentId = state.getCurrentPlayerId()
@@ -49,7 +49,7 @@ def subscribe(context,responses):
 		# trading is done for all agents in this turn
 		if context.auctionStarted:
 			return Phase.AUCTION
-		return Phase.BUY_HOUSES
+		return Phase.UNMORTGAGE
 	
 	# do mortgage, selling and trade for the next agent
 	return Phase.MORTGAGE

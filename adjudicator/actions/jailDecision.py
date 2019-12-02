@@ -63,13 +63,8 @@ def handle_in_jail_state(state,action):
 	
 	if (isinstance(action, tuple) or isinstance(action, list)) and len(action)>0:
 		if action[0] == 'P':
-			playerCash = state.getCash(currentPlayerId)
-			# TODO: The player may not have enough money here. Is this the correct way to implement this?
-			if playerCash>=50:
-				state.setCash(currentPlayerId,playerCash-50)
-			else:
-				state.addDebt(currentPlayerId,50)
-			
+			# The player may not have enough money here.
+			state.addDebt(currentPlayerId,50)
 			state.setPosition(currentPlayerId,JUST_VISTING)
 			state.resetJailCounter(currentPlayerId)
 			return [True,False]
@@ -103,13 +98,8 @@ def handle_in_jail_state(state,action):
 	
 	state.incrementJailCounter(currentPlayerId)
 	if state.getJailCounter(currentPlayerId)==3:
-		playerCash = state.getCash(currentPlayerId)
-		#The player has to pay $50 and get out. 
-		if playerCash>=50:
-			state.setCash(currentPlayerId,playerCash-50)
-		else:
-			#This is added as debt so that the player has the opportunity to resolve it.
-			state.addDebt(currentPlayerId,50)
+		# The player may not have enough money here.
+		state.addDebt(currentPlayerId,50)
 		state.setPosition(currentPlayerId,JUST_VISTING)
 		state.resetJailCounter(currentPlayerId)
 

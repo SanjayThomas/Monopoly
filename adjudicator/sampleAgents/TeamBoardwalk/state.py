@@ -4,7 +4,7 @@ import json
 
 from board import board, MAX_HOUSES, MAX_HOTELS, groups, Group
 
-StateTuple = namedtuple("StateTuple", "current_player turn properties positions money phase phaseData debt")
+StateTuple = namedtuple("StateTuple", "current_player turn properties positions money phase phaseData")
 TradeData = namedtuple("TradeData", "moneyOffered propertiesOffered moneyRequested propertiesRequested")
 
 # makes it possible to print a state without printing all of the past states
@@ -53,7 +53,6 @@ class State:
 			self.bankrupt = stateTuple['player_loss_status']
 			self.phase = stateTuple['phase']
 			self.phaseData = stateTuple['phase_payload']
-			self.debt = stateTuple['player_debts']
 	
 	def getOpponents(self,id):
 		return [playerId for playerId in self.player_ids if not playerId==id]
@@ -107,13 +106,9 @@ class State:
 			if prop.owner == player: count += 1
 		return count
 
-	def makePayment(self, player1, player2, amount):
-		if player1 != -1: self.debt[player1] += amount
-		if player2 != -1: self.money[player2] += amount
-
 	def toTuple(self):
 		return StateTuple(self.current_player_id, self.turn, [str(prop) for prop in self.properties], self.positions,
-						  self.money, self.phase, self.phaseData, self.debt)
+						  self.money, self.phase, self.phaseData)
 
 	def __str__(self):
 		return str(self.toTuple())

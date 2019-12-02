@@ -23,12 +23,11 @@ def subscribe(context,reponses):
 
 	for agentId,bid in reponses.items():
 		playerCash = state.getCash(agentId)
-		playerDebt = state.getDebt(agentId)
 		bid = check_valid_cash(bid)
 
 		#Only if the player has enough money should his bid be considered valid
 		# TODO: bids could be the same
-		if bid > winningBid and (playerCash - playerDebt) >= bid:
+		if (bid > winningBid) and (playerCash >= bid):
 			auctionWinner = agentId
 			winningBid = bid
 
@@ -44,4 +43,4 @@ def subscribe(context,reponses):
 	# return Phase.AUCTION_RESULT
 	
 	state.setPhasePayload(None)
-	return Phase.BUY_HOUSES
+	return Phase.UNMORTGAGE

@@ -10,7 +10,6 @@ def publish(context):
 	currentPlayerId = state.getCurrentPlayerId()
 	playerPosition = state.getPosition(currentPlayerId)
 	playerCash = state.getCash(currentPlayerId)
-	playerDebt = state.getDebt(currentPlayerId)
 
 	price = board[playerPosition]['price']
 	
@@ -18,7 +17,7 @@ def publish(context):
 	
 	log("buy","Agent {} has landed on the unowned property {}".format(currentPlayerId, playerPosition))
 
-	if price > (playerCash - playerDebt):
+	if price > playerCash:
 		# default to auction
 		return []
 
