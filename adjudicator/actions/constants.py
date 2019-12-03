@@ -25,9 +25,6 @@ MONOPOLY_GROUPS = [
 	[37,39]
 ]
 
-# timeout for each action of the agent
-ACTION_TIMEOUT = 5
-
 # if phase is not listed, default action is None
 DEFAULT_ACTIONS = {
 	Phase.JAIL           : ("P",),

@@ -36,10 +36,6 @@ class App extends Component {
     };
   }
 
-  startGame = async () => {
-    console.log("start");
-  }
-
   handleSelect = eventKey => {
     if (eventKey in PAGE_TYPES) {
       this.props.setPageType(PAGE_TYPES[eventKey]);
@@ -55,7 +51,6 @@ class App extends Component {
   };
 
   onSignIn = (googleUser) => {
-    console.log("Signed In");
     var profile = googleUser.getBasicProfile();
 
     if (window.session === undefined) {
@@ -76,7 +71,7 @@ class App extends Component {
       this.props.setSessionId(sessionId);
     });
 
-    console.log('ID: ' + googleUser.getAuthResponse().id_token);
+    //console.log('ID: ' + googleUser.getAuthResponse().id_token);
     console.log('Name: ' + profile.getGivenName());
   }
 
@@ -177,8 +172,6 @@ class App extends Component {
   componentDidMount() {
     const realm = "realm1";
 
-    console.log(url);
-
     const connection = new Autobahn.Connection({
      url,
      realm
@@ -187,7 +180,7 @@ class App extends Component {
     connection.onopen = session => {
      window.session = session;
     };
-
+    
     connection.open();
   }
 
@@ -216,7 +209,7 @@ class App extends Component {
           <Navbar.Toggle aria-controls="responsive-navbar-nav" />
           <Navbar.Collapse id="responsive-navbar-nav">
             <Nav className="mr-auto">
-              <Nav.Link eventKey="create_solo">Start One-Off Game</Nav.Link>
+              <Nav.Link eventKey="create_solo">Start Game</Nav.Link>
               {false && <Dropdown as={Nav.Item}>
                   <Dropdown.Toggle
                     as={Nav.Link}>
@@ -259,7 +252,7 @@ class App extends Component {
             </Nav>
           </Navbar.Collapse>
         </Navbar>
-        <Container style={{ marginTop: "4%", textAlign: 'left'}}>
+        <Container fluid={true} style={{ marginTop: "4%", textAlign: 'left'}}>
           { pageRender() }
         </Container>
           

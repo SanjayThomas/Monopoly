@@ -26,16 +26,18 @@ class BaseAgent(ApplicationSession):
 		
 		# call a remote procedure.
 		res = yield self.call(join_game_uri,self.sessionId)
-		print("The agent was assigned the id: {}".format(res))
-		print("Use this ID instead of your session ID to join this game if you get disconnected")
-		print("This is a workaround to join the game again since the session ID could timeout.")
-		print("Thus, run your agent as: python agent.py <game ID> <agent ID>")
 		if res[0] == 1:
 			print("The following error occurred.")
 			print(res[1])
 			self.leave()
+			return
 
 		self.id = res[1]
+		print("The agent was assigned the id: {}".format(self.id))
+		print("Use this ID instead of your session ID to join this game if you get disconnected")
+		print("This is a workaround to join the game again since the session ID could timeout.")
+		print("Thus, run your agent as: python agent.py <game ID> <agent ID>")
+		
 		self.endpoints = {
 			'REQUEST'   : 'monopoly.game{}.agent{}.request',
 			'RESPONSE'  : 'monopoly.game{}.agent{}.response'

@@ -144,7 +144,7 @@ class RiskyAgent(BaseAgent):
 
 		return None
 	  
-	def endGame(self,winner):
+	def endGame(self,state):
 		state = State(state)
 		if isinstance(state.phaseData, dict):
 			print("Total Stats:")

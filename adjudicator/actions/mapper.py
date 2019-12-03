@@ -1,5 +1,5 @@
-from state import Phase
-from actions.constants import ACTION_TIMEOUT, DEFAULT_ACTIONS
+from state import Phase, ACTION_TIMEOUT
+from actions.constants import DEFAULT_ACTIONS
 from twisted.internet import reactor
 
 class Mapper:

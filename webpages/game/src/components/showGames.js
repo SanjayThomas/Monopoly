@@ -1,16 +1,15 @@
 import React, { Component } from "react";
 import { connect } from "react-redux";
 import Table from 'react-bootstrap/Table';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
 import Badge from 'react-bootstrap/Badge';
-import Button from "react-bootstrap/Button";
-import Dropdown from 'react-bootstrap/Dropdown';
-import DropdownButton from 'react-bootstrap/DropdownButton';
 import Alert from 'react-bootstrap/Alert';
 
 import { setProp } from "../redux/actions.js";
 
 import { CopyClipboard } from './copyClipboard.js';
-import { GAME_TYPE_TEXT, TEAM_BOARDWALK, fetchEndpoint, joinEndpoint, uiupdatesEndpoint } from './constants.js';
+import { GAME_TYPE_TEXT, fetchEndpoint, uiupdatesEndpoint } from './constants.js';
 
 function log() {
   console.log("hello");
@@ -100,16 +99,16 @@ class ShowGames extends Component {
         cGames: cGames, jGames: jGames
       }));
     }
-    else if (data[0] === 1) {
+    else if (data[0] === 1 || data[0] === 2) {
       let { cGames, jGames } = this.state;
       for (let cGame of cGames) {
         if (cGame.tourId === data[1]) {
-          cGame.status = 1;
+          cGame.status = data[0];
         }
       }
       for (let jGame of jGames) {
         if (jGame.tourId === data[1]) {
-          jGame.status = 1;
+          jGame.status = data[0];
         }
       }
       
@@ -143,10 +142,40 @@ class ShowGames extends Component {
     return min+":"+sec;
   };
 
+  getStatusContent = (game) => {
+    // game status content
+    let timerContent = '';
+
+    if (game.status === 0) {
+      if (game.expireTime > 0) {
+        let joinedCount = 0;
+        if (game.jPlayers) {
+          joinedCount = game.jPlayers.length;  
+        }
+
+        timerContent = (<div>
+                  <p>Game has not started. Will expire in: {this.convertTimer(game.expireTime)}</p>
+                  <p>{joinedCount}/{game.noPlayers} players have joined.</p>
+                  </div>);
+      }
+      else {
+        timerContent = <p>Game has Expired!</p>;
+      }
+    }
+    else if (game.status === 1) timerContent = <p>The game has started.</p>;
+    else timerContent = <p>The game has been completed.</p>;
+
+    return timerContent;
+  }
+
   render() {
     const { cGames, jGames, fetchCompleted } = this.state;
+    const { fetchNew } = this.props;
 
     return (
+      <Row>
+      <Col md={2}></Col>
+      <Col md={8}>
       <div>
         {(fetchCompleted && cGames.length === 0 && jGames.length === 0) && <Alert variant='danger'>You have not started or joined any games.</Alert>}
         {(cGames.length > 0 || jGames.length > 0) &&
@@ -165,10 +194,10 @@ class ShowGames extends Component {
                   <th>#</th>
                   <th>ID</th>
                   <th>Game Type</th>
-                  <th>Total Players</th>
-                  <th>Games</th>
-                  <th>Joined Players</th>
-                  <th>Game Status</th>
+                  <th># Players</th>
+                  <th># Games</th>
+                  <th>Game Details</th>
+                  {fetchNew && <th>Game Status</th>}
                 </tr>
               </thead>
               <tbody>
@@ -180,84 +209,22 @@ class ShowGames extends Component {
                   <td>{GAME_TYPE_TEXT[game.tourType]}</td>
                   <td>{game.noPlayers}</td>
                   <td>{game.noGames}</td>
-                  <td>
-                  {
-                    (game.jPlayers.length === 0) && "No player has joined"
-                  }
-                  {
-                    game.jPlayers.map((player, jIndex) => {
-                      const variants = ['success', 'danger', 'warning', 'info', 'secondary', 'dark' ];
-                      // TODO: might need to change later
-                      if (player === this.props.email) {
-                        return (<Badge pill key={jIndex} variant={variants[jIndex]}
-                          style={{marginRight: '2px',fontSize: '1rem'}}>
-                          {player[0]}{false && <CopyClipboard name={game.currentAgentId} content="Copy Agent ID"/>}
-                          </Badge>);
-                      }
-                      return (<Badge pill key={jIndex} variant={variants[jIndex]}
-                        style={{marginRight: '2px',fontSize: '1rem'}}>{player[0]}</Badge>);
-                    })
-                  }
-                  {
-                    (false && !game.jPlayers.includes(this.props.email)) &&
-                    (<Button variant="outline-primary" size="sm"
-                      onClick={() => {
-                        if (window.session === undefined) {
-                          console.log("The session hasn't been initialized yet.")
-                          return;
-                        }
-                        let uri = joinEndpoint.replace("{}",game.tourId);
-                        window.session.call(uri, [this.props.sessionId]).then(
-                        agentId => {
-                          if (agentId === "ERROR") {
-                            console.log("Error while joining the game.");
-                          }
-                          else {
-                            console.log("Your agentId: "+agentId);
-                            let { cGames, jGames } = this.state;
-                            for (let cGame of cGames) {
-                              if (cGame.tourId === game.tourId) {
-                                cGame.jPlayers.push(this.props.email);
-                                cGame.currentAgentId = agentId;
-                              }
-                            }
-                            for (let jGame of jGames) {
-                              if (jGame.tourId === game.tourId) {
-                                jGame.jPlayers.push(this.props.email);
-                                jGame.currentAgentId = agentId;
-                              }
-                            }
-                            
-                            this.setState((state, props) => ({
-                              cGames: cGames, jGames: jGames
-                            }));
-                          }
-                        });
-                      }}
-                      style={{marginRight: '4px', display:'inline'}}>Join</Button>)
-                  }
-                  { false && (<DropdownButton id="add_our_agent"
-                      variant="outline-primary"
-                      title="Add Test Agent"
-                      size="sm"
-                      style={{marginRight: '2px', display:'inline'}}>
-                        <Dropdown.Item eventKey="team_boardwalk">Team Boardwalk</Dropdown.Item>
-                      </DropdownButton>)
-                  }</td>
-                  {(game.status === 0) ? 
-                    (game.expireTime > 0 ? 
-                      (<td>Expires in: {this.convertTimer(game.expireTime)}</td>) : (<td>Game has Expired!</td>)
-                    ) : (<td>
-                    <Table striped bordered>
+                  <td style={{padding:0}}>
+                    <Table striped bordered style={{margin:0}}>
                       <tbody>
-                        <tr style={{fontWeight: 'bold'}}><td>Total # Games</td><td>{game.finishedGames}/{game.noGames}</td></tr>
+                        <tr style={{fontWeight: 'bold'}}><td className="detail_row">Games Completed</td><td className="detail_row">{game.finishedGames}/{game.noGames}</td></tr>
                         {game.jPlayers.map((jPlayer, jIndex) => {
-                          return (<tr key={jIndex}><td>{jPlayer[0]}</td><td>{jPlayer[1]}</td></tr>);
+                          const variants = ['success', 'danger', 'warning', 'info', 'secondary', 'dark' ];
+                          return (<tr key={jIndex}><td className="detail_row">
+                            <Badge pill key={jIndex} variant={variants[jIndex]} className="player_pill">
+                              {jPlayer[0]}
+                            </Badge>
+                          </td><td className="detail_row">{jPlayer[1]}</td></tr>);
                         })}
                       </tbody>
                     </Table>
-                    </td>)
-                  }
+                  </td>
+                  {fetchNew && <td>{this.getStatusContent(game)}</td>}
                 </tr>
                 );
               })}
@@ -272,11 +239,12 @@ class ShowGames extends Component {
               <thead>
                 <tr>
                   <th>#</th>
+                  <th>ID</th>
                   <th>Game Type</th>
-                  <th>Total Players</th>
-                  <th>Games</th>
-                  <th>Joined Players</th>
-                  <th>Game Status</th>
+                  <th># Players</th>
+                  <th># Games</th>
+                  <th>Game Details</th>
+                  {fetchNew && <th>Game Status</th>}
                 </tr>
               </thead>
               <tbody>
@@ -284,30 +252,26 @@ class ShowGames extends Component {
                 return (
                 <tr key={index} onClick={log}>
                   <td>{index+1}</td>
+                  <td style={{textAlign:'center'}}><CopyClipboard name={game.tourId+" "+this.props.sessionId}/></td>
                   <td>{GAME_TYPE_TEXT[game.tourType]}</td>
                   <td>{game.noPlayers}</td>
                   <td>{game.noGames}</td>
-                  <td>{
-                    game.jPlayers.map((player, jIndex) => {
-                      const variants = ['success', 'danger', 'warning', 'info', 'secondary', 'dark' ];
-                      return (<Badge pill key={jIndex} variant={variants[jIndex]}
-                        style={{marginRight: '2px',fontSize: '1rem'}}>{player[0]}</Badge>);
-                    })
-                  }</td>
-                  {(game.status === 0) ? 
-                    (game.expireTime > 0 ? 
-                      (<td>Expires in: {this.convertTimer(game.expireTime)}</td>) : (<td>Game has Expired!</td>)
-                    ) : (<td>
-                    <Table striped bordered>
+                  <td style={{padding:0}}>
+                    <Table striped bordered style={{margin:0}}>
                       <tbody>
-                        <tr style={{fontWeight: 'bold'}}><td>Total # Games</td><td>{game.finishedGames}/{game.noGames}</td></tr>
+                        <tr style={{fontWeight: 'bold'}}><td className="detail_row">Games Completed</td><td className="detail_row">{game.finishedGames}/{game.noGames}</td></tr>
                         {game.jPlayers.map((jPlayer, jIndex) => {
-                          return (<tr key={jIndex}><td>{jPlayer[0]}</td><td>{jPlayer[1]}</td></tr>);
+                          const variants = ['success', 'danger', 'warning', 'info', 'secondary', 'dark' ];
+                          return (<tr key={jIndex}><td className="detail_row">
+                            <Badge pill key={jIndex} variant={variants[jIndex]} className="player_pill">
+                              {jPlayer[0]}
+                            </Badge>
+                          </td><td className="detail_row">{jPlayer[1]}</td></tr>);
                         })}
                       </tbody>
                     </Table>
-                    </td>)
-                  }
+                  </td>
+                  {fetchNew && <td>{this.getStatusContent(game)}</td>}
                 </tr>
                 );
                 })}
@@ -316,6 +280,9 @@ class ShowGames extends Component {
           </div>
         }
       </div>
+      </Col>
+      <Col md={2}></Col>
+      </Row>
     );
 
   }

@@ -406,18 +406,15 @@ class GameGen(ApplicationSession):
             expireTime = floor(resSet['createTime'] + GAME_EXPIRE_TIME - time())
 
             self.logger("Fetching joined Players using tourId: "+str(resSet['id']))
-            jSQL = """SELECT u.email,ug.agentId,ug.winCount FROM user u
+            jSQL = """SELECT u.email,ug.winCount FROM user u
                     JOIN user_sologame ug ON u.id = ug.userId
                     WHERE ug.tourId=%s"""
             cursor.execute(jSQL, (resSet['id'],))
             userSet = cursor.fetchall()
 
-            currentAgentId = None
             jPlayers = []
             if userSet is not None:
                 for user in userSet:
-                    if email == user['email']:
-                        currentAgentId = user['agentId']
                     jPlayers.append([user['email'],user['winCount']])
 
             record = {
@@ -432,9 +429,6 @@ class GameGen(ApplicationSession):
             }
             if resSet['tourType'] == 0:
                     record['noPpg'] = resSet['noPpg']
-
-            if currentAgentId is not None:
-                record['currentAgentId'] = currentAgentId
 
             if resSet['winUserId'] is not None:
                 uSql = "SELECT email FROM user WHERE id=%s"
@@ -479,7 +473,7 @@ class GameGen(ApplicationSession):
 
         except Exception as e:
             self.logger("SQL SELECT inside fetch_mygames failed.")
-            self.logger(e)
+            self.logger(str(e))
             result = []
 
         return result

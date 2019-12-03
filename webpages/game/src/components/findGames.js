@@ -3,6 +3,8 @@ import { connect } from "react-redux";
 import InputGroup from 'react-bootstrap/InputGroup';
 import FormControl from 'react-bootstrap/FormControl';
 import Button from "react-bootstrap/Button";
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
 
 import GameDetails from './gameDetails.js';
 
@@ -11,7 +13,9 @@ const FindGames = props => {
   const [renderDetail, setRenderDetail] = useState(false);
 
   return (
-  <div>
+  <Row>
+    <Col md={2}></Col>
+    <Col md={8}>
     <InputGroup className="mb-5">
       <FormControl
       placeholder="Enter the Game ID"
@@ -25,7 +29,9 @@ const FindGames = props => {
       </InputGroup.Append>
     </InputGroup>
     {renderDetail ? <GameDetails key={gameId.split(" ")[0]} currentGameId={gameId.split(" ")[0]}/> : ""}
-  </div>
+    </Col>
+    <Col md={2}></Col>
+  </Row>
   );
 };
 

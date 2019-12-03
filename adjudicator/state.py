@@ -9,6 +9,9 @@ MAX_HOUSES = 32
 MAX_HOTELS = 12
 NUMBER_OF_PROPERTIES = 42
 
+# timeout for each action of the agent
+ACTION_TIMEOUT = 5
+
 class Property:
 	def __init__(self,houses,mortgaged,ownerId,propertyId):
 		self.houses = houses # value in range 0-5
@@ -344,7 +347,8 @@ class State:
 					("player_cash",self.cash),
 					("player_loss_status", self.bankrupt),
 					("phase", self.phase),
-					("phase_payload", self.phasePayload)])
+					("phase_payload", self.phasePayload),
+					("timeout",ACTION_TIMEOUT)])
 	
 	def toJson(self):
 		return json.dumps(self.toDict())
@@ -466,7 +470,7 @@ class Reason:
 	TIMEOUT = "Timeout"
 	BANKRUPT = "Bankruptcy"
 	
-#state = State([1,2,3,4])
+#state = State(["1","2"])
 #print(state.toJson())
 #for value in json.loads(state.toJson()):
 #	print(value)

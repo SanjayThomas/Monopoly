@@ -3,13 +3,10 @@ import { connect } from "react-redux";
 import Jumbotron from 'react-bootstrap/Jumbotron';
 import Table from 'react-bootstrap/Table';
 import Badge from 'react-bootstrap/Badge';
-import Button from "react-bootstrap/Button";
-import Dropdown from 'react-bootstrap/Dropdown';
-import DropdownButton from 'react-bootstrap/DropdownButton';
 import Alert from 'react-bootstrap/Alert';
 
 import { CopyClipboard } from './copyClipboard.js';
-import { GAME_TYPE_TEXT, fetchEndpoint, joinEndpoint, uiupdatesEndpoint } from './constants.js';
+import { GAME_TYPE_TEXT, fetchEndpoint, uiupdatesEndpoint } from './constants.js';
 
 class GameDetails extends Component {
 
@@ -72,39 +69,13 @@ class GameDetails extends Component {
     data = data[0];
 
     if (data[0] === 0) {
-      let { cGames, jGames } = this.state;
-      for (let cGame of cGames) {
-        if (cGame.tourId === data[1]) {
-          cGame.finishedGames = data[2];
-          cGame.jPlayers = data[3];
-        }
-      }
-      for (let jGame of jGames) {
-        if (jGame.tourId === data[1]) {
-          jGame.finishedGames = data[2];
-          jGame.jPlayers = data[3];
-        }
-      }
-      
       this.setState((state, props) => ({
-        cGames: cGames, jGames: jGames
+        finishedGames: data[2], jPlayers: data[3]
       }));
     }
-    else if (data[0] === 1) {
-      let { cGames, jGames } = this.state;
-      for (let cGame of cGames) {
-        if (cGame.tourId === data[1]) {
-          cGame.status = 1;
-        }
-      }
-      for (let jGame of jGames) {
-        if (jGame.tourId === data[1]) {
-          jGame.status = 1;
-        }
-      }
-      
+    else if (data[0] === 1 || data[0] === 2) {
       this.setState((state, props) => ({
-        cGames: cGames, jGames: jGames
+        status: data[0]
       }));
     }
   }
@@ -147,7 +118,41 @@ class GameDetails extends Component {
   };
 
   render() {
-    let { tourId, tourType, noPlayers, noGames, jPlayers, creator, expireTime, currentAgentId, status, fetchCompleted } = this.state;
+    let { tourId, tourType, noPlayers, noGames, jPlayers,creator, expireTime,
+      finishedGames, status, fetchCompleted } = this.state;
+
+    // game status content
+    let timerContent = '<td></td>';
+    let statusContent = '<td></td>';
+    if (status === 0) {
+      if (expireTime > 0) {
+        timerContent = <p>Game has not started. Will expire in: {this.convertTimer(expireTime)}</p>;
+      }
+      else {
+        timerContent = <p>Game has Expired!</p>;
+      }
+    }
+    else if (status === 1) timerContent = <p>The game has started.</p>;
+    else timerContent = <p>The game has been completed.</p>;
+    if (!jPlayers || jPlayers.length === 0) {
+      statusContent = <p>No player has joined.</p>;
+    }
+    else {
+      const variants = ['success', 'danger', 'warning', 'info', 'secondary', 'dark' ];
+      statusContent = <Table responsive>
+                      <tbody>
+                      <tr style={{fontWeight: 'bold'}}><td>Total # Games</td><td>{finishedGames}/{noGames}</td></tr>
+                      {jPlayers.map((jPlayer, jIndex) => {
+                        return <tr key={jIndex}><td>
+                          <Badge pill key={jIndex} variant={variants[jIndex]} className="player_pill">
+                          {jPlayer[0]}
+                          </Badge>
+                          </td><td>{jPlayer[1]}/{noGames}</td></tr>;
+                      })}
+                      </tbody>
+                      </Table>;
+    }
+
 
     return (
       <div>
@@ -189,58 +194,11 @@ class GameDetails extends Component {
             <td>Total number of games:</td>
             <td>{noGames}</td>
           </tr>
-          <tr>
-            <td>Joined Players: </td>
-            <td>
-            {
-              (jPlayers.length === 0) && "No player has joined"
-            }
-            {
-              jPlayers.map((player, jIndex) => {
-                const variants = ['success', 'danger', 'warning', 'info', 'secondary', 'dark' ];
-                return (<Badge pill key={jIndex} variant={variants[jIndex]}
-                  style={{marginRight: '2px',fontSize: '1rem'}}>{player}</Badge>);
-              })
-            }
-            {
-              (false && !jPlayers.includes(this.props.email)) &&
-              (<Button variant="outline-primary" size="sm"
-                onClick={() => {
-                  if (window.session === undefined) {
-                    console.log("The session hasn't been initialized yet.")
-                    return;
-                  }
-                  let uri = joinEndpoint.replace("{}",tourId);
-                  window.session.call(uri, [this.props.sessionId]).then(
-                  agentId => {
-                    if (agentId === "ERROR") {
-                      console.log("Error while joining the game.");
-                    }
-                    else {
-                      console.log("Your agentId: "+agentId);
-                      //let { curr } = this.state;
-                      jPlayers.push(this.props.email);
-                      
-                      this.setState((state, props) => ({
-                        jPlayers: jPlayers, currentAgentId: agentId
-                      }));
-                    }
-                  });
-                }}
-                style={{marginRight: '4px', display:'inline'}}>Join</Button>)
-            }
-            </td>
-          </tr>
-          <tr>
-            <td>Game Status:</td>
-            {(status === 0) ? 
-              (expireTime > 0 ? 
-                (<td>Expires in: {this.convertTimer(expireTime)}</td>) : (<td>Game has Expired!</td>)
-              ) : (<td>0/{noGames}</td>)
-            }
-          </tr>
         </tbody>
         </Table>
+        <h4 style={{marginBottom: '1rem'}}>Game Status:</h4>
+        {timerContent}
+        {statusContent}
       </Jumbotron>
       </div>
       }
