@@ -6,8 +6,6 @@ import Col from 'react-bootstrap/Col';
 import Badge from 'react-bootstrap/Badge';
 import Alert from 'react-bootstrap/Alert';
 
-import { setProp } from "../redux/actions.js";
-
 import { CopyClipboard } from './copyClipboard.js';
 import { GAME_TYPE_TEXT, fetchEndpoint, uiupdatesEndpoint } from './constants.js';
 
@@ -30,10 +28,8 @@ class ShowGames extends Component {
     else {
       payload = [props.sessionId,1,false];
     }
-    console.log(payload);
     window.session.call(fetchEndpoint, payload).then(
     data => {
-      console.log(data);
       this.setState((state, props) => ({
         fetchCompleted: true
       }));
@@ -288,13 +284,6 @@ class ShowGames extends Component {
   }
 };
 
-const mapDispatchToProps = dispatch => ({
-  setPageType: pageType =>
-    dispatch(setProp("pageType", pageType)),
-  setCurrentGameId: currentGameId =>
-    dispatch(setProp("currentGameId", currentGameId))
-});
-
 const mapStateToProps = state => {
   return {
     pageType: state.pageType,
@@ -305,6 +294,5 @@ const mapStateToProps = state => {
 };
 
 export default connect(
-  mapStateToProps,
-  mapDispatchToProps
+  mapStateToProps
 )(ShowGames);

@@ -2,11 +2,11 @@ import * as actionTypes from "./actionTypes";
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case actionTypes.SET_PROP:
-      const { prop, value } = action;
+    case actionTypes.SET_PROPS:
+      const { props } = action;
       return {
         ...state,
-        [prop]: value 
+        ...props
       };
 
     default:

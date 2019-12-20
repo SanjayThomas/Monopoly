@@ -51,7 +51,11 @@ export const adjustPlayerPositions = playersPositions => {
 };
 
 const amIOwner = (property, myId) => {
-  return property.owned === true && property.ownerId === myId;
+  return 'ownerId' in property && property.ownerId === myId;
+};
+
+export const getColors = () => {
+  return ['red','blue','green','gold','cyan','magenta','orange','pink']
 };
 
 const completedMonopoly = (properties, property, myId) => {
@@ -63,54 +67,72 @@ const completedMonopoly = (properties, property, myId) => {
   return true;
 };
 
-const getBSMCandidates = state => {
-  const { properties, myId } = state;
-
-  return properties.filter(property => {
-    if (property.class !== "street") return false;
-    if (!amIOwner(property, myId)) return false;
-    if (!completedMonopoly(properties, property, myId)) return false;
-    return true;
-  });
+const buySellFilter = (property, properties, myId) => {
+  if (property.class !== "street") return false;
+  if (!amIOwner(property, myId)) return false;
+  if (!completedMonopoly(properties, property, myId)) return false;
+  return true;
 };
 
-export const getBuyingCandidates = state => {
-  const candidates = getBSMCandidates(state)
-    .filter(property => property.houses < 5)
+export const getBuyingCandidates = (properties, myId) => {
+  const candidates = properties
+    .filter(property => buySellFilter(property, properties, myId) && (property.houses < 5))
     .map(property => property.id);
   return candidates;
 };
 
-export const getSellingCandidates = state => {
-  return getBSMCandidates(state)
-    .filter(property => property.houses > 0)
+export const getSellingCandidates = (properties, myId) => {
+  const candidates = properties
+    .filter(property => buySellFilter(property, properties, myId) && (property.houses > 0))
+    .map(property => property.id);
+  return candidates;
+};
+
+export const getTradeCandidates = (properties, playerId) => {
+  return properties.filter(property => mortgageFilter(property, properties, playerId))
     .map(property => property.id);
 };
 
-const constructionsInMonopolyGroup = (properties, property, myId) => {
+const mortgageFilter = (property, properties, myId) => {
+  if (!amIOwner(property, myId)) return false;
+  if (property.houses > 0) return false;
+
   const group_elements = property.monopoly_group_elements;
   for (let index = 0; index < group_elements.length; index++) {
     const group_element = group_elements[index];
-    if (properties[group_element].houses > 0 || properties[group_element].hotel)
-      return false;
+    if (properties[group_element].houses > 0) return false;
   }
+  return true;
 };
 
-export const getMortgageCandidates = state => {
-  const { properties, myId } = state;
-
+export const getMortgageCandidates = (properties, myId) => {
   return properties
     .filter(property => {
       if (property.mortgaged) return false;
-      if (!amIOwner(property, myId)) return false;
-      if (property.houses > 0 || property.hotel) return false;
-      // if (
-      //   completedMonopoly(properties, property, myId) &&
-      //   constructionsInMonopolyGroup(properties, property, myId)
-      // )
-      //   return false;
-
-      return true;
+      return mortgageFilter(property, properties, myId);
     })
     .map(property => property.id);
 };
+
+export const getUnmortgageCandidates = (properties, myId) => {
+  return properties
+    .filter(property => {
+      if (!property.mortgaged) return false;
+      return mortgageFilter(property, properties, myId);
+    })
+    .map(property => property.id);
+};
+
+export const convertTimer = timer => {
+    let min = Math.floor(timer/60);
+    let sec = timer%60;
+
+    if (sec < 10) {
+      sec = "0" + sec;
+    }
+    if (min < 10) {
+      min = "0" + min;
+    }
+
+    return min+":"+sec;
+  };

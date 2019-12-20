@@ -51,9 +51,10 @@ class GameGen(ApplicationSession):
         yield self.register(self.addOurAgent,"com.monopoly.add_our_agent")
 
     def logger(self,msg):
-        # print(msg)
+        #print(msg)
         with open("game_gen.log", "a") as f:
             f.write(msg+"\n")
+        #pass
 
 
     def signin(self,*args):
@@ -164,40 +165,45 @@ class GameGen(ApplicationSession):
 
     def create_game(self,*args):
         self.logger("Inside create_game")
-        ERROR = "ERROR"
+        ERROR = "Implementation error. Please contact admins."
 
         try:
             sessionId = args[0]
             gameType = int(args[1])
             noPlayers = int(args[2])
             noGames = int(args[3])
+            timePerMove = int(args[4])
+            allowHumans = bool(args[5])
             if gameType > 0:
                 noPpg = 2
                 if len(args) > 4:
-                    noPpg = int(args[4])
+                    noPpg = int(args[6])
             else:
                 noPpg = None
                     
         except:
-            return ERROR
+            return [1,"Insufficient number of parameters. Please include session ID, game type, number of players and number of games."]
 
         if not (isinstance(sessionId,str) and match('^[a-zA-Z0-9]+$',sessionId)):
-            return ERROR
+            return [1,"Invalid session ID."]
 
         if gameType < 0 or gameType > 2:
-            return ERROR
+            return [1,"Invalid value for game type"]
 
         if noPlayers < 2:
-            return ERROR
+            return [1,"Number of players should be greater than 2"]
 
         if gameType == 0 and noPlayers > 8:
-            return ERROR
+            return [1,"Number of players should be less than 8"]
 
         if noGames < 1:
-            return ERROR
+            return [1,"Invalid value for number of games"]
+
+        if timePerMove < 3:
+            return [1,"A time per move < 3 would face network latency issues. Please try again."]
     
         if gameType > 0 and (noPpg < 2 or noPpg > 8):
-            return ERROR    
+            return [1,"Invalid value for number of players per game"]  
         
         connection = pymysql.connect(host=self.mysql_host,
                              port=3306,
@@ -229,19 +235,19 @@ class GameGen(ApplicationSession):
             except:
                 self.logger("SQL SELECT in create_game failed.")
                 connection.close()
-                return ERROR
+                return [1,ERROR]
 
         userId = self.fetch_creds(sessionId, connection)
         if userId is None:
             # Possibly indicating session timeout
             connection.close()
-            return ERROR
+            return [1,"Invalid session ID."]
         
-        createSQL = """INSERT INTO tournament (tourUID, tourType,
-                    noPlayers, noGames, noPpg, createUserId, createTime)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s)"""
+        createSQL = """INSERT INTO tournament (tourUID, tourType, noPlayers,
+            noGames, noPpg, createUserId, createTime, timePerMove, allowHumans)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
         createPayload = (tourUID, gameType, noPlayers, noGames, noPpg,
-                userId['id'], time())
+                userId['id'], time(), timePerMove, allowHumans)
 
         try:
             with connection.cursor() as cursor:
@@ -250,21 +256,21 @@ class GameGen(ApplicationSession):
             connection.commit()
         except:
             self.logger("SQL INSERT failed.")
-            tourUID = ERROR
+            tourUID = "ERROR"
         finally:
             connection.close()
 
-        if tourUID == ERROR:
-            return tourUID
+        if tourUID == "ERROR":
+            return [1,ERROR]
         
         # sys.executable gets the python executable used to start the current script
         if gameType == 0:
             popen_id = Popen([sys.executable,"./newAdjudicator.py",str(tourUID),
-                str(noPlayers),str(noGames)])
+                str(noPlayers),str(noGames),str(timePerMove)])
             sleep(2)
 
         self.logger("Generated tourUID: "+tourUID)
-        return tourUID
+        return [0,tourUID]
 
     def fetch_creds(self, sessionId, connection):
         try:
@@ -326,7 +332,8 @@ class GameGen(ApplicationSession):
     def fetch_tournament(self,tourId, email, connection):
         self.logger("In fetch_tournament for {}".format(tourId))
         fetchSql = """SELECT id, tourUID, tourType, noPlayers, noGames, noPpg,
-                    createTime, createUserId, status, finishedGames, winUserId
+                    createTime, createUserId, timePerMove, allowHumans, status,
+                    finishedGames, winUserId
                     FROM tournament WHERE tourUID=%s;"""
         result = None
         try:
@@ -373,7 +380,9 @@ class GameGen(ApplicationSession):
                     'jPlayers'     : jPlayers,
                     'creator'      : cResSet['email'],
                     'status'       : resSet['status'],
-                    'finishedGames': resSet['finishedGames']
+                    'finishedGames': resSet['finishedGames'],
+                    'timePerMove'  : resSet['timePerMove'],
+                    'allowHumans'  : resSet['allowHumans']
                 }
                 if resSet['tourType'] > 0:
                     result['noPpg'] = resSet['noPpg']

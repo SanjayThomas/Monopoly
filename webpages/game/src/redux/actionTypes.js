@@ -1,1 +1,1 @@
-export const SET_PROP = "SET_PROP";
+export const SET_PROPS = "SET_PROPS";

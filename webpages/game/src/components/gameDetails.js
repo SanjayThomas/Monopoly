@@ -16,7 +16,7 @@ class GameDetails extends Component {
     this.state = { tourId: null, expireTime: 0, fetchCompleted: false };
 
     if ( !('currentGameId' in props) || (props.currentGameId==="ERROR") ) {
-      console.log("Invalid Game.");
+      alert("The game could not be opened. Please contact the admins.");
       return;
     }
 
@@ -27,8 +27,6 @@ class GameDetails extends Component {
 
     window.session.call(fetchEndpoint, [props.sessionId, 0, props.currentGameId]).then(
     data => {
-      console.log(props.sessionId);
-      console.log(props.currentGameId);
       console.log(data);
       if (data.length > 0) {
         let newState = { ...data[0] };
@@ -118,8 +116,8 @@ class GameDetails extends Component {
   };
 
   render() {
-    let { tourId, tourType, noPlayers, noGames, jPlayers,creator, expireTime,
-      finishedGames, status, fetchCompleted } = this.state;
+    let { tourId, tourType, noPlayers, noGames, jPlayers, creator, expireTime,
+      finishedGames, status, fetchCompleted, allowHumans } = this.state;
 
     // game status content
     let timerContent = '<td></td>';
@@ -172,6 +170,9 @@ class GameDetails extends Component {
         Invoke your agent as: python agent.py &lt;gameID&gt; &lt;sessionID&gt;<br/>
         Click on the Clipboard icon next to the Game ID for the game you want to join to copy the string "&lt;gameID&gt; &lt;sessionID&gt;"
         </Alert>
+        {allowHumans && <Alert variant='success'>
+        To join this game as a human player, click on this URL: <a href="http://localhost:5000/" target="_blank">http://localhost:5000/</a>
+        </Alert>}
         <Table borderless>
           <tbody>
           <tr>

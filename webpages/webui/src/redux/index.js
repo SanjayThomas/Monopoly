@@ -1,47 +1,44 @@
-import { createStore, applyMiddleware } from "redux";
+import { createStore } from "redux";
 import reducer from "./reducers";
 import properties from "./properties";
-import monopolyMiddleware from "./middlewares";
 
 const initialState = {
-  players: [],
-  currentPlayer: -1,
-  myId: -1,
-  currentPhase: "",
-  playerAction: "",
-  endpoints: {},
-  rawState: {},
-  bsmCandidates: {
-    buyingCandidates: [],
-    sellingCandidates: [],
-    mortgageCandidates: []
-  },
+  joined: false,
+  gameId: "",
+  sessionId: "",
+  myId: "",
+  resUri: "",
   properties,
-  playersCash: {},
+  players: [],
+  currentPlayer: "",
+  turnNumber: 0,
   playersPositions: {},
-  formData: {},
-  showPropertyModal: false,
+  playersCash: {},
+  bankrupt: {},
+  phase: "PRE_GAME",
+  phasePayload: "",
+  timeout: -1,
   selectedPropertyIndex: -1,
-  showJailDecisionModal: false,
-  showToastMessage: false,
-  toastMessage: "",
-  toastTitle: ""
+  propertyIndex: -1,
+
+  actionCash: 0,
+  actionProps: [],
+  otherPlayerId: "",
+  otherActionProps: [],
+
+  buyCandidates: [],
+  sellCandidates: [],
+  mortgageCandidates: [],
+  unmortgageCandidates: [],
+  tradeCandidates: [],
+  otherTradeCandidates: [],
+  
+  showPropertyModal: false
 };
-
-const middlewares = [];
-
-//register our middleware
-middlewares.push(monopolyMiddleware);
-
-if (process.env.NODE_ENV === "development") {
-  const { logger } = require("redux-logger");
-  middlewares.push(logger);
-}
 
 const store = createStore(
   reducer,
-  initialState,
-  applyMiddleware(...middlewares)
+  initialState
 );
 
 export default store;

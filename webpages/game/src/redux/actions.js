@@ -1,5 +1,5 @@
 import * as actionTypes from "./actionTypes";
 
-export const setProp = (prop,value) => {
-  return { type: actionTypes.SET_PROP, prop, value };
+export const setProps = props => {
+  return { type: actionTypes.SET_PROPS, props };
 };

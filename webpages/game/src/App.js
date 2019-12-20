@@ -14,10 +14,15 @@ import Alert from 'react-bootstrap/Alert';
 import './App.css';
 import "bootstrap/dist/css/bootstrap.css";
 
-import { setProp } from "./redux/actions.js";
+import {
+  PAGE_TYPES,
+  CLIENT_ID,
+  url,
+  signinEndpoint,
+  signoutEndpoint
+} from './components/constants';
+import { setProps } from "./redux/actions.js";
 
-import { PAGE_TYPES, CLIENT_ID, url, signinEndpoint, signoutEndpoint } from './components/constants';
-import { BracketGame } from './components/bracketGame.js';
 import CreateGame from './components/createGame';
 import ShowGames from './components/showGames.js';
 import GameDetails from './components/gameDetails.js';
@@ -48,13 +53,15 @@ class App extends Component {
   failCallback = (error,details) => {
     console.log("Failure Error Code: "+error);
     console.log(details);
+    alert("Google login/logout failed. Please try again.");
   };
 
   onSignIn = (googleUser) => {
     var profile = googleUser.getBasicProfile();
 
     if (window.session === undefined) {
-      console.log("The session hasn't been initialized yet.")
+      console.log("The session hasn't been initialized yet.");
+      alert("Unexpected error. Please try signing in again.");
       return;
     }
     
@@ -67,18 +74,13 @@ class App extends Component {
         email: profile.getEmail(),
         imageUrl: profile.getImageUrl()
       });
-      this.props.setEmail(profile.getEmail());
-      this.props.setSessionId(sessionId);
+      this.props.setCreds(profile.getEmail(),sessionId);
+    },reason => {
+      alert("Backend server is down. Please contact the admins.");
     });
-
-    //console.log('ID: ' + googleUser.getAuthResponse().id_token);
-    console.log('Name: ' + profile.getGivenName());
   }
 
   logout = () => {
-    console.log("Logged out");
-    const email = this.state.email;
-
     this.setState({
       isSignedIn: false,
       givenName: null,
@@ -87,16 +89,17 @@ class App extends Component {
     });
 
     if (window.session === undefined) {
-      console.log("The session hasn't been initialized yet.")
+      console.log("The session hasn't been initialized yet.");
+      alert("Unexpected error. Please try signing in again.");
       return;
     }
     
-    window.session.call(signoutEndpoint, [email]).then(
+    window.session.call(signoutEndpoint, [this.state.email]).then(
     status => {
-      console.log("Status: "+status);
+      console.log("Logged out");
+    },reason => {
+      alert("Backend server is down. Please contact the admins.");
     });
-
-    
   }
 
   logoutButtonRender = (renderProps) => {
@@ -104,22 +107,8 @@ class App extends Component {
   }
 
   pageRender = () => {
+    const { pageType, currentGameId } = this.props;
     const { failCallback, onSignIn } = this;
-
-    const tournaments = [
-      {
-        gameType: 0, nPlayers: 4, nGames: 100, jPlayers: ['Sanjay','Pragesh','Supreeth','Nikhil']
-      },
-      {
-        gameType: 0, nPlayers: 4, nGames: 100, jPlayers: ['Sanjay','Pragesh','Supreeth'], expireTime: 510
-      },
-      {
-        gameType: 1, nPlayers: 4, nGames: 100, n_ppg: 2, jPlayers: ['Sanjay','Pragesh','Supreeth','Nikhil']
-      },
-      {
-        gameType: 2, nPlayers: 4, nGames: 100, n_ppg: 2, jPlayers: ['Sanjay','Pragesh','Supreeth']
-      }
-    ];
 
     if (!this.state.isSignedIn) {
       return (<div>
@@ -136,7 +125,7 @@ class App extends Component {
               </div>);
     }
 
-    switch(this.props.pageType) {
+    switch(pageType) {
       case PAGE_TYPES.signin:
       return (<div>
               <Row style={{textAlign: 'center', marginTop: '28%'}}>
@@ -159,7 +148,7 @@ class App extends Component {
       case PAGE_TYPES.show_all:
       return (<ShowGames key="new" fetchNew={true}/>);
       case PAGE_TYPES.game_details:
-      return (<GameDetails currentGameId={this.props.currentGameId}/>);
+      return (<GameDetails currentGameId={currentGameId}/>);
       case PAGE_TYPES.find_games:
       return (<FindGames/>);
       case PAGE_TYPES.show_old:
@@ -188,19 +177,6 @@ class App extends Component {
     
     const { isSignedIn, givenName, imageUrl } = this.state;
     const { handleSelect,failCallback,onSignIn,logout,logoutButtonRender, pageRender } = this;
-
-    /*
-    const match_one   = [ {name: "Team A",wins:21},{name: "Team B",wins:24},{name: "Team C",wins:35} ];
-    const match_two   = [ {name: "Team D",wins:15},{name: "Team E",wins:42},{name: "Team F",wins:43} ];
-    const match_three = [ {name: "Team G",wins:65},{name: "Team H",wins:27},{name: "Team I",wins:8} ];
-    const match_four  = [ {name: "Team C",wins:27},{name: "Team F",wins:30},{name: "Team G",wins:43} ];
-    const match_five  = [ {name: "Team C"} ];
-
-    const bracket_one = [
-      [match_one,match_two,match_three],
-      [match_four]
-    ];
-    */
 
     return (
       <div className="App">
@@ -262,12 +238,13 @@ class App extends Component {
 }
 
 const mapDispatchToProps = dispatch => ({
-  setPageType: pageType =>
-    dispatch(setProp("pageType", pageType)),
-  setEmail: email =>
-    dispatch(setProp("email", email)),
-  setSessionId: sessionId =>
-    dispatch(setProp("sessionId", sessionId))
+  setPageType: pageType => dispatch(setProps({
+    pageType: pageType
+  })),
+  setCreds: (email,sessionId) => dispatch(setProps({
+    email: email,
+    sessionId: sessionId
+  }))
 });
 
 const mapStateToProps = state => {

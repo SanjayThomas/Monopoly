@@ -399,12 +399,6 @@ const properties = [
     id: 36,
     class: "chance",
     name: "Chance",
-    monopoly: "None",
-    monopoly_size: 0,
-    price: 0,
-    build_cost: 0,
-    rent: [0, 0, 0, 0, 0, 0],
-    tax: 0
   },
   {
     id: 37,

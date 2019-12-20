@@ -10,6 +10,8 @@ export const JAIL_DECISION_ACTION = "jail";
 
 // endpoints
 export const JOIN_GAME_ENDPOINT = "com.game{%game_id%}.joingame";
+export const REQ_ENDPOINT = "monopoly.game{%game_id%}.agent{%agent_id%}.request";
+export const RES_ENDPOINT = "monopoly.game{%game_id%}.agent{%agent_id%}.response";
 
 export const Phase = {
   NO_ACTION: 0,

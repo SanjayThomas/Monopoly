@@ -6,7 +6,7 @@ import Col from 'react-bootstrap/Col';
 import Button from "react-bootstrap/Button";
 import Toast from 'react-bootstrap/Toast';
 
-import { setProp } from "../redux/actions.js";
+import { setProps } from "../redux/actions.js";
 
 import { PAGE_TYPES, ONE_OFF, GAME_TYPE_TEXT, createEndpoint } from './constants';
 
@@ -15,6 +15,7 @@ const CreateGame = props => {
   const [noGames, setNoGames] = useState(100);
   const [noPpg, setNoPpg] = useState(2);
   const [allowHuman, setAllowHuman] = useState(false);
+  const [timePerMove, setTimePerMove] = useState(5);
 
   // By default, assume the game is a One-Off game
   let gameType = ONE_OFF;
@@ -58,6 +59,15 @@ const CreateGame = props => {
           value={noPpg}
           onChange={event => setNoPpg(event.target.value)}/>
       </Form.Group>}
+      <Form.Group controlId="formGroupTime">
+        <Form.Label>Time per Move (in seconds)</Form.Label>
+        <Form.Control
+          type="number"
+          placeholder="Time per Move"
+          min="3"
+          value={timePerMove}
+          onChange={event => setTimePerMove(event.target.value)} />
+      </Form.Group>
       {gameType === ONE_OFF && <Form.Check custom
         type='checkbox'
         id='allow_human'
@@ -66,6 +76,7 @@ const CreateGame = props => {
         onChange={
           event => {
             setNoGames(1);
+            setTimePerMove(60);
             setAllowHuman(event.target.checked);
           }
         }
@@ -75,15 +86,15 @@ const CreateGame = props => {
           console.log("The session hasn't been initialized yet.")
           return;
         }
-        const data = gameType === ONE_OFF ? [props.sessionId, gameType, noPlayers, noGames] : [props.sessionId, gameType, noPlayers, noGames, noPpg];
+        const data = gameType === ONE_OFF ? [props.sessionId, gameType, noPlayers, noGames, timePerMove, allowHuman]
+         : [props.sessionId, gameType, noPlayers, noGames, timePerMove, allowHuman, noPpg];
         window.session.call(createEndpoint, data).then(
-        gameId => {
-          if (gameId === "ERROR") {
-            console.log("Error while creating the game.");
+        data => {
+          if (data[0] === 1) {
+            alert(data[1]);
           }
           else {
-            props.setCurrentGameId(gameId);
-            props.setPageType(PAGE_TYPES.game_details);
+            props.showDetail(data[1]);
           }
         });
       }}>Start Game</Button>
@@ -114,6 +125,14 @@ const CreateGame = props => {
       <Toast show={true}>
         <Toast.Header closeButton={false}>
           <div className="toast_tag"/>
+          <p className="toast_text">Time per Move (in seconds)</p>
+        </Toast.Header>
+        <Toast.Body>Time allowed for an agent in this game to make their move.
+        If the agent doesn't respond in this time, a default action is taken and the game progresses.</Toast.Body>
+      </Toast>
+      <Toast show={true}>
+        <Toast.Header closeButton={false}>
+          <div className="toast_tag"/>
           <p className="toast_text">Allow Human Players</p>
         </Toast.Header>
         <Toast.Body>Both Human Players and AI agents can take part in these games.</Toast.Body>
@@ -125,10 +144,10 @@ const CreateGame = props => {
 };
 
 const mapDispatchToProps = dispatch => ({
-  setPageType: pageType =>
-    dispatch(setProp("pageType", pageType)),
-  setCurrentGameId: currentGameId =>
-    dispatch(setProp("currentGameId", currentGameId))
+  showDetail: currentGameId => dispatch(setProps({
+    currentGameId: currentGameId,
+    pageType: PAGE_TYPES.game_details
+  }))
 });
 
 const mapStateToProps = state => {

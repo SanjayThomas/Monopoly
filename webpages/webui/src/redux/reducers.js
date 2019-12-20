@@ -1,90 +1,123 @@
 import * as actionTypes from "./actionTypes";
-import { adjustPlayerPositions, mergeProperties } from "utils";
+import {
+  adjustPlayerPositions,
+  mergeProperties,
+  getBuyingCandidates,
+  getSellingCandidates,
+  getMortgageCandidates,
+  getUnmortgageCandidates,
+  getTradeCandidates } from "utils";
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case actionTypes.RECEIVE_MESSAGE:
-      const { rawState, phase } = action;
+
+    case actionTypes.SET_PROPS:
+      const { props } = action;
       return {
         ...state,
-        ...rawState,
-        phase,
-        properties: mergeProperties(state.properties, rawState.properties),
+        ...props
+      };
+
+    case actionTypes.SET_SELECTED_PROP_INDEX:
+      const { selectedPropertyIndex } = action;
+
+      if (state.phase === 'MORTGAGE') {
+        if (state.mortgageCandidates.includes(selectedPropertyIndex) &&
+          !state.actionProps.includes(selectedPropertyIndex)) {
+          const mortValue = parseInt(state.properties[selectedPropertyIndex].price/2);
+          return {
+            ...state,
+            selectedPropertyIndex,
+            actionProps: [...state.actionProps, selectedPropertyIndex],
+            actionCash: state.actionCash + mortValue
+          };
+        }
+        return {
+          ...state,
+          selectedPropertyIndex
+        };
+      }
+      if (state.phase === 'UNMORTGAGE') {
+        if (state.unmortgageCandidates.includes(selectedPropertyIndex) &&
+          !state.actionProps.includes(selectedPropertyIndex)) {
+          const mortValue = parseInt(state.properties[selectedPropertyIndex].price/2);
+          return {
+            ...state,
+            selectedPropertyIndex,
+            actionProps: [...state.actionProps, selectedPropertyIndex],
+            actionCash: state.actionCash - mortValue
+          };
+        }
+        return {
+          ...state,
+          selectedPropertyIndex
+        };
+      }
+      if (state.phase === 'TRADE') {
+        if ((state.properties[selectedPropertyIndex].ownerId === state.myId) &&
+          state.tradeCandidates.includes(selectedPropertyIndex) &&
+          !state.actionProps.includes(selectedPropertyIndex)) {
+          return {
+            ...state,
+            selectedPropertyIndex,
+            actionProps: [...state.actionProps, selectedPropertyIndex]
+          };
+        }
+
+        if ((state.properties[selectedPropertyIndex].ownerId === state.otherPlayerId) &&
+          state.otherTradeCandidates.includes(selectedPropertyIndex) &&
+          !state.otherActionProps.includes(selectedPropertyIndex)) {
+          return {
+            ...state,
+            selectedPropertyIndex,
+            otherActionProps: [...state.otherActionProps, selectedPropertyIndex]
+          };
+        }
+      }
+      return {
+        ...state,
+        selectedPropertyIndex
+      };
+    
+    case actionTypes.SET_OTHER_PLAYER:
+      const { otherPlayerId } = action;
+      return {
+        ...state,
+        otherPlayerId,
+        otherTradeCandidates: getTradeCandidates(state.properties,otherPlayerId)
+      };
+
+    case actionTypes.RECEIVE_MESSAGE:
+      const { rawState } = action;
+      const newProps = mergeProperties(state.properties, rawState.properties);
+      return {
+        ...state,
         players: rawState.player_ids,
         currentPlayer: rawState.current_player_id,
+        turnNumber: rawState.turn_number,
+        properties: newProps,
         playersPositions: adjustPlayerPositions(
           rawState.player_board_positions
         ),
-        playersCash: rawState.player_cash
-      };
-
-    case actionTypes.SET_MY_ID:
-      const { id: myId } = action;
-      return {
-        ...state,
-        myId: myId
-      };
-
-    case actionTypes.SET_ENDPOINTS:
-      const { endpoints } = action;
-      return {
-        ...state,
-        endpoints: endpoints
-      };
-
-    case actionTypes.SET_PLAYER_ACTION:
-      const { playerAction } = action;
-      return {
-        ...state,
-        playerAction
-      };
-
-    case actionTypes.SET_BSM_CANDIDATES:
-      const { bsmCandidates } = action;
-      return {
-        ...state,
-        bsmCandidates
-      };
-
-    case actionTypes.SET_FORM_DATA:
-      const { formData, propertyId } = action;
-      return {
-        ...state,
-        formData: {
-          ...state.formData,
-          [propertyId]: formData
-        }
-      };
-
-    case actionTypes.RESET_FORM:
-      return {
-        ...state,
-        formData: {},
-        playerAction: ""
+        playersCash: rawState.player_cash,
+        bankrupt: rawState.player_loss_status,
+        phase: rawState.phase,
+        phasePayload: rawState.phase_payload,
+        timeout: rawState.timeout,
+        selectedPropertyIndex: rawState.player_board_positions[state.myId],
+        buyCandidates: getBuyingCandidates(newProps,state.myId),
+        sellCandidates: getSellingCandidates(newProps,state.myId),
+        mortgageCandidates: getMortgageCandidates(newProps,state.myId),
+        unmortgageCandidates: getUnmortgageCandidates(newProps,state.myId),
+        tradeCandidates: getTradeCandidates(newProps,state.myId)
       };
 
     case actionTypes.TOGGLE_PROPERTY_MODAL:
-      const { showPropertyModal, selectedPropertyIndex } = action;
+      const { showPropertyModal, propertyIndex } = action;
       return {
         ...state,
         showPropertyModal,
-        selectedPropertyIndex
-      };
-
-    case actionTypes.TOGGLE_JAIL_DECISION_MODAL:
-      const { showJailDecisionModal } = action;
-      return {
-        ...state,
-        showJailDecisionModal
-      };
-
-    case actionTypes.TOGGLE_TOAST_MESSAGE:
-      const { showToastMessage, toastTitle, toastMessage } = action;
-      return {
-        ...state,
-        showToastMessage,
-        toastTitle,
-        toastMessage
+        propertyIndex
       };
 
     default:
