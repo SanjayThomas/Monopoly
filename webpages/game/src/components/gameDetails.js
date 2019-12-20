@@ -172,6 +172,7 @@ class GameDetails extends Component {
         </Alert>
         {allowHumans!==0 && <Alert variant='success'>
         To join this game as a human player, click on this URL: <a href="http://monopoly-ai.com/sbu_agent/" target="_blank">http://monopoly-ai.com/sbu_agent/</a>
+        The human player interface requires the game ID to be entered to join this game. Copy the game ID as per the instructions above.
         </Alert>}
         <Table borderless>
           <tbody>
