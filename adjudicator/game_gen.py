@@ -185,7 +185,7 @@ class GameGen(ApplicationSession):
             return [1,"Insufficient number of parameters. Please include session ID, game type, number of players and number of games."]
 
         if not (isinstance(sessionId,str) and match('^[a-zA-Z0-9]+$',sessionId)):
-            return [1,"Invalid session ID."]
+            return [1,"Invalid session ID. Please refresh the page and try again."]
 
         if gameType < 0 or gameType > 2:
             return [1,"Invalid value for game type"]
@@ -241,7 +241,7 @@ class GameGen(ApplicationSession):
         if userId is None:
             # Possibly indicating session timeout
             connection.close()
-            return [1,"Invalid session ID."]
+            return [1,"Invalid session ID. Please refresh the page and try again."]
         
         createSQL = """INSERT INTO tournament (tourUID, tourType, noPlayers,
             noGames, noPpg, createUserId, createTime, timePerMove, allowHumans)

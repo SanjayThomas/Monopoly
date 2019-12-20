@@ -11,9 +11,9 @@ from baseAgent import BaseAgent
 from autobahn.twisted.wamp import ApplicationRunner
 
 class Property:
-    def __init__(self, id, owner, houses, mortgaged):
+    def __init__(self, id, ownerId, houses, mortgaged):
         self.id = id
-        self.owner = owner
+        self.ownerId = ownerId
         self.houses = houses
         self.mortgaged = mortgaged
 
@@ -24,20 +24,20 @@ class State(object):
         self.my_id = state['current_player_id']
         self.opponent_id = ""
         for playerId in state['player_ids']:
-            if playerId != my_id:
-                opponent_id = playerId
+            if playerId != self.my_id:
+                self.opponent_id = playerId
                 break
         self.turn = state['turn_number']
         self.player_properties = []
         for id, value in enumerate(state['properties']):
-            owner = value['ownerId']
+            ownerId = value['ownerId']
             mortgaged = value['mortgaged']
             houses = value['houses']
-            self.player_properties.append(Property(id, owner, houses, mortgaged))
-        self.my_position = state['player_board_positions'][my_id]
-        self.opponent_position = state['player_board_positions'][opponent_id]
-        self.my_cash = state['player_cash'][my_id]
-        self.opponent_cash = state['player_cash'][opponent_id]
+            self.player_properties.append(Property(id, ownerId, houses, mortgaged))
+        self.my_position = state['player_board_positions'][self.my_id]
+        self.opponent_position = state['player_board_positions'][self.opponent_id]
+        self.my_cash = state['player_cash'][self.my_id]
+        self.opponent_cash = state['player_cash'][self.opponent_id]
         self.phase = state['phase']
         self.payload = state['phase_payload']
 
@@ -185,15 +185,15 @@ class Agent(BaseAgent):
         opponent_id = stateobj.opponent_id
 
         for propId, prop in enumerate(stateobj.player_properties):
-            if prop.owner == my_id and not prop.mortgaged:
+            if propId < 40 and prop.ownerId == my_id and not prop.mortgaged:
                 ids.append(propId)
                 square_obj = board[propId]
                 price = square_obj["price"]
                 if square_obj["class"] == "Street":
                     colour = square_obj["monopoly"]
                     build_cost = square_obj["build_cost"]
-                    num_houses = props.houses
-                    self.my_streets[colour][propid] = [build_cost, num_houses, price]
+                    num_houses = prop.houses
+                    self.my_streets[colour][propId] = [build_cost, num_houses, price]
                     if len(self.my_streets[colour]) == square_obj["monopoly_size"]:
                         self.monopoly_set.add(colour)
                 elif square_obj["class"] == "Utility":
@@ -432,7 +432,7 @@ class Agent(BaseAgent):
         pref = {}
         my_id = stateobj.my_id
         for id, prop in enumerate(stateobj.player_properties):
-            if prop.ownerId == my_id and prop.mortgaged:
+            if id < 40 and prop.ownerId == my_id and prop.mortgaged:
                 square_obj = board[id]
                 if square_obj['monopoly'] in pref:
                     pref[square_obj['monopoly']].append(id)
@@ -492,11 +492,11 @@ class Agent(BaseAgent):
     def value_of_properties(stateobj, properties_lst):
         total_value = 0
         for id in properties_lst:
-            if stateobj.player_properties[id].mortgaged:
-                total_value += board[id]["price"] * 0.45
+            prop = stateobj.player_properties[id]
+            if prop.mortgaged:
+                total_value += board[id]["price"] * 0.5
             else:
-                total_value += board[id]["price"] + \
-                               (abs(stateobj.player_properties[id]) - 1) * board[id]["build_cost"]
+                total_value += board[id]["price"] + (prop.houses * board[id]["build_cost"])
         return total_value
 
     def net_trade_deal_amount(self, stateobj, cash_offered, cash_requested, properties_offered, properties_requested):
@@ -538,9 +538,9 @@ class Agent(BaseAgent):
         stateobj = self.get_state_object(state)
         self.update_my_properties(stateobj)
         self.update_opp_props(stateobj)
-        cash_offer, properties_offered, cash_requested, properties_requested = stateobj.payload
+        agentId, cash_offer, properties_offered, cash_requested, properties_requested = stateobj.payload
         # Do not accept if opponent is in debt (ignoring my debt here)
-        if stateobj.opponent_debt > 0:
+        if stateobj.opponent_cash < 0:
             return False
 
         net_amount = self.net_trade_deal_amount(stateobj, cash_offer,
@@ -564,7 +564,7 @@ class Agent(BaseAgent):
             return False
 
     def update_opp_props(self, stateobj):
-        opp_id = self.get_other_agent()
+        opp_id = self.get_other_agent(stateobj)
         self.opp_streets = OrderedDict({
             "Orange": {},
             "Red": {},
@@ -580,7 +580,7 @@ class Agent(BaseAgent):
         self.opp_mortgaged_props = {}
         opponent_id = stateobj.opponent_id
         for id, prop in enumerate(stateobj.player_properties):
-            if prop.ownerId == opponent_id:
+            if id < 40 and prop.ownerId == opponent_id:
                 square_obj = board[id]
                 price = square_obj["price"]
                 if prop.mortgaged:
@@ -589,8 +589,7 @@ class Agent(BaseAgent):
                 if square_obj["class"] == "Street":
                     colour = square_obj["monopoly"]
                     build_cost = square_obj["build_cost"]
-                    num_houses = abs(status) - 1
-                    self.opp_streets[colour][id] = (build_cost, num_houses, price)
+                    self.opp_streets[colour][id] = (build_cost, prop.houses, price)
                     # if len(self.opp_streets[colour][id]) == square_obj["monopoly_size"]:
                     #     self.monopoly_set.add(colour)
                 elif square_obj["class"] == "Utility":
@@ -626,12 +625,16 @@ class Agent(BaseAgent):
         giveaway_props = copy.deepcopy(useless_props)
         giveaway_props.extend(buffer)
 
+        debt_left = 0
+        if stateobj.my_cash < 0:
+            debt_left = -1 * (stateobj.my_cash)
+
         if len(self.rail_roads) > 0 and len(self.opp_rail_roads) > 0:
             # Strategy 3: If we have one railroad, get railroad from him
             # & give prop without forming cg to him
             tmp_lst = []
             id = list(self.opp_rail_roads.keys())[0]
-            cash_to_match = board[id]['price'] + stateobj.debt
+            cash_to_match = board[id]['price'] + debt_left
             for useless_prop in useless_props:
                 cash_to_match -= board[useless_prop]['price']
                 tmp_lst.append(useless_prop)
@@ -639,14 +642,14 @@ class Agent(BaseAgent):
                     continue
                 else:
                     cash_req = abs(cash_to_match)
-                    return 'T', 0, tmp_lst, cash_req, [id]
+                    return [stateobj.opponent_id, 0, tmp_lst, cash_req, [id]]
         else:
             if random.randint(1, 101) % 2:
                 # Strategy 1 (taking care of debt + requesting imp props)
                 if props_req and useless_props:
                     for prop in props_req:
                         tmp_lst = []
-                        cash_to_match = board[prop]['price'] + stateobj.debt
+                        cash_to_match = board[prop]['price'] + debt_left
                         for id in useless_props:
                             # trying all combinations of useless prop and prop to offer
                             cash_to_match -= board[id]['price']
@@ -655,21 +658,21 @@ class Agent(BaseAgent):
                                 continue
                             else:
                                 cash_req = abs(cash_to_match)
-                                return 'T', 0, tmp_lst, cash_req, [prop]
+                                return [stateobj.opponent_id, 0, tmp_lst, cash_req, [prop]]
                         if cash_to_match > 0:
                             continue
                 elif not useless_props:
                     for prop in props_req:
                         cash_offer = board[prop]['price']
                         if stateobj.my_cash >= cash_offer + 300:
-                            return 'T', cash_offer, [], 0, [prop]
+                            return [stateobj.opponent_id, cash_offer, [], 0, [prop]]
             else:
                 # Strategy 2: taking care of debt + giving off useless
                 # props by asking for cash
                 if useless_props:
                     tmp_lst = []
                     # TODO: For nw, trying to snatch 300 from the opponent
-                    cash_to_match = stateobj.debt + 300
+                    cash_to_match = debt_left + 300
                     for id in useless_props:
                         # trying all combinations of useless prop and prop to offer
                         cash_to_match -= board[id]['price']
@@ -678,13 +681,13 @@ class Agent(BaseAgent):
                             continue
                         else:
                             cash_req = abs(cash_to_match)
-                            return 'T', 0, tmp_lst, cash_req, []
+                            return [stateobj.opponent_id, 0, tmp_lst, cash_req, []]
 
         # TODO: Trade reverse order preference of street class
         # Backup Strategy (taking care of debt by giving away useless props)
-        if stateobj.debt and giveaway_props:
+        if debt_left and giveaway_props:
             tmp_lst = []
-            cash_to_match = stateobj.debt
+            cash_to_match = debt_left
             for id in giveaway_props:
                 # trying all combinations of useless prop and prop to offer
                 cash_to_match -= board[id]['price']
@@ -693,7 +696,7 @@ class Agent(BaseAgent):
                     continue
                 else:
                     cash_req = abs(cash_to_match)
-                    return 'T', 0, tmp_lst, cash_req, []
+                    return [stateobj.opponent_id, 0, tmp_lst, cash_req, []]
 
         return None
 
@@ -728,7 +731,7 @@ class Agent(BaseAgent):
             is_imp = True
             for propid in space['monopoly_group_elements']:
                 prop = stateobj.player_properties[propid]
-                if prop.owner != opp_id:
+                if prop.ownerId != opp_id:
                     is_imp = False
             if is_imp:
                 return True
@@ -794,7 +797,7 @@ class Agent(BaseAgent):
         is_imp = True
         for _propid in space['monopoly_group_elements']:
             prop = stateobj.player_properties[_propid]
-            if prop.owner != opp_id:
+            if prop.ownerId != opp_id:
                 is_imp = False
         if is_imp:
             # if his cash is less, his cash + 1
@@ -820,18 +823,18 @@ class Agent(BaseAgent):
     def jailDecision(self, state):
         stateobj = self.get_state_object(state)
         if self.get_turns_left(stateobj) < 30 or stateobj.my_cash < 50:
-            return 'R', None
+            return 'R'
 
-        if stateobj.my_id == stateobj.player_properties[40].owner:
-            return 'C', 40
-        elif stateobj.my_id == stateobj.player_properties[41].owner:
-            return 'C', 41
+        if stateobj.my_id == stateobj.player_properties[40].ownerId:
+            return ['C', 40]
+        elif stateobj.my_id == stateobj.player_properties[41].ownerId:
+            return ['C', 41]
         else:
-            return 'P', None
+            return 'P'
 
 if __name__ == '__main__':
-    url = environ.get("CBURL", u"ws://localhost:4000/ws")
-    #url = environ.get("CBURL", u"ws://monopoly-ai.com/ws")
+    #url = environ.get("CBURL", u"ws://localhost:4000/ws")
+    url = environ.get("CBURL", u"ws://monopoly-ai.com/ws")
     if six.PY2 and type(url) == six.binary_type:
         url = url.decode('utf8')
     realm = environ.get('CBREALM', u'realm1')

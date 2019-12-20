@@ -16,14 +16,16 @@ class BaseAgent(ApplicationSession):
 	def onJoin(self, details):
 		print("Session attached!")
 		
+		#TODO: Configuration for these
 		#Command line args
-		self.gameId = "1"
+		self.gameId = sys.argv[1]
+		self.sessionId = sys.argv[2]
 		
 		#URIs
-		join_game_uri = 'com.game{}.joingame'.format(self.gameId,"TeamMonopoly")
+		join_game_uri = 'com.game{}.joingame'.format(self.gameId)
 		
-		# call a remote procedure
-		res = yield self.call(join_game_uri)
+		# call a remote procedure.
+		res = yield self.call(join_game_uri,self.sessionId)
 		if res[0] == 1:
 			print("The following error occurred.")
 			print(res[1])
@@ -58,14 +60,14 @@ class BaseAgent(ApplicationSession):
 			#'COMMUNITY_CHEST'    :
 			#'AUCTION_RESULT'     :
 			#'MORTGAGE_RESULT'    :
+			#'UNMORTGAGE_RESULT'    :
 			#'SELL_HOUSES_RESULT' :
 			#'TRADE_RESULT'       :
 			#'BUY_HOUSES_RESULT'  :
 			'END_TURN'           : self.endTurn,
-			#'BANKRUPT'           : 
 		}
 		
-		uri = self.endpoints['REQUEST'].format(self.gameId, self.id)
+		uri = self.endpoints['REQUEST'].format(self.gameId, self.sessionId)
 		self.requestId = yield self.subscribe(self.mapper, uri, options=SubscribeOptions(get_retained=True))
 
 		print("Successfully registered!")
@@ -80,7 +82,7 @@ class BaseAgent(ApplicationSession):
 		print("Inside mapper for phase: {}".format(phase))
 		if phase in self.phaseToMethod:
 			result = self.phaseToMethod[phase](state)
-		uri = self.endpoints['RESPONSE'].format(self.gameId, self.id)
+		uri = self.endpoints['RESPONSE'].format(self.gameId, self.sessionId)
 		self.publish(uri, phase, result, options=PublishOptions(acknowledge=True,retain=True))
 
 		if phase == "END_GAME" and isinstance(jsonState['phase_payload'], dict):

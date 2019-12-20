@@ -30,7 +30,7 @@ def subscribe(context, responses):
 		return Phase.DICE_ROLL
 
 	# agent is currently in jail
-	outOfJail,diceThrown = handle_in_jail_state(context.state,context.dice,response)
+	outOfJail,diceThrown = handle_in_jail_state(context,response)
 
 	context.diceThrown = diceThrown
 	
@@ -53,7 +53,8 @@ Return values are 2 boolean values:
 1. Whether the player is out of jail.
 2. Whether there was a dice throw while handling jail state.
 """
-def handle_in_jail_state(state,dice,action):
+def handle_in_jail_state(context,action):
+	state = context.state
 	currentPlayerId = state.getCurrentPlayerId()
 	
 	log("jail","Agent {}'s Jail Decision: {}".format(currentPlayerId,action))
@@ -76,9 +77,9 @@ def handle_in_jail_state(state,dice,action):
 				
 				if state.rightOwner(currentPlayerId,action[1]):
 					if action[1] == COMMUNITY_GET_OUT_OF_JAIL_FREE:
-						chest.deck.append(communityChestCards[4])
+						context.chest.deck.append(communityChestCards[4])
 					elif action[1] == CHANCE_GET_OUT_OF_JAIL_FREE:
-						chance.deck.append(chanceCards[7])
+						context.chance.deck.append(chanceCards[7])
 					
 					state.setPropertyUnowned(action[1])
 					
@@ -88,6 +89,7 @@ def handle_in_jail_state(state,dice,action):
 					return [True,False]
 	
 	"""If both the above method fail for some reason, we default to dice roll."""
+	dice = context.dice
 	dice.roll()
 	if dice.double:
 		# Player can go out

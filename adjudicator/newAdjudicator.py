@@ -242,7 +242,7 @@ class Adjudicator(ApplicationSession):
     def timeoutHandler(self):
         self.logger('In joingame timeoutHandler')
         if not self.gameStarted:
-            sql = "DELETE FROM oneoffgame WHERE gameId=%s"
+            sql = "DELETE FROM tournament WHERE tourUID=%s"
             payload = (self.gameId,)
             self.singleQuery(sql,payload,commit=True)
             

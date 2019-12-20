@@ -225,8 +225,8 @@ if __name__ == '__main__':
 	if len(sys.argv) < 3:
 		sys.exit("Not enough arguments")
 	
-	url = environ.get("CBURL", u"ws://localhost:4000/ws")
-	#url = environ.get("CBURL", u"ws://monopoly-ai.com/ws")
+	#url = environ.get("CBURL", u"ws://localhost:4000/ws")
+	url = environ.get("CBURL", u"ws://monopoly-ai.com/ws")
 	if six.PY2 and type(url) == six.binary_type:
 		url = url.decode('utf8')
 	realm = environ.get('CBREALM', u'realm1')
