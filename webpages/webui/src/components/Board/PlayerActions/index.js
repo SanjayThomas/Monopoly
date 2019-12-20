@@ -87,11 +87,25 @@ const PlayerActions = ({ joined, phase, resUri, resetActionProps, resetTradeProp
                   <Card.Title>Game Started!</Card.Title>
                 </Card.Body>
               </Card>);
+    setTimeout(() => {
+      window.session.publish(resUri,[phase]); 
+    }, 3000);
+    break;
+    case 'END_GAME':
+    content = (<Card className="text-center">
+                <Card.Body>
+                  <Card.Title>The game has ended</Card.Title>
+                </Card.Body>
+              </Card>);
+    setTimeout(() => {
+      window.session.publish(resUri,[phase]); 
+    }, 1000);
+    break;
     default:
     console.log("Calling "+resUri+" from PlayerActions default case.");
     setTimeout(() => {
       window.session.publish(resUri,[phase]); 
-    }, 3000);
+    }, 1000);
   }
 
   return (
