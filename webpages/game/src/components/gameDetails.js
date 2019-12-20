@@ -171,7 +171,7 @@ class GameDetails extends Component {
         Click on the Clipboard icon next to the Game ID for the game you want to join to copy the string "&lt;gameID&gt; &lt;sessionID&gt;"
         </Alert>
         {allowHumans && <Alert variant='success'>
-        To join this game as a human player, click on this URL: <a href="http://localhost:5000/" target="_blank">http://localhost:5000/</a>
+        To join this game as a human player, click on this URL: <a href="http://monopoly-ai.com/sbu_agent/" target="_blank">http://monopoly-ai.com/sbu_agent/</a>
         </Alert>}
         <Table borderless>
           <tbody>
