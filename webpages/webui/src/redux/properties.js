@@ -122,7 +122,7 @@ const properties = [
   },
   {
     id: 12,
-    class: "utility electric-company",
+    class: "utility",
     name: "Electric Company",
     monopoly: "Utility",
     monopoly_size: 2,
@@ -308,7 +308,7 @@ const properties = [
   },
   {
     id: 28,
-    class: "utility waterworks",
+    class: "utility",
     name: "Water Works",
     monopoly: "Utility",
     monopoly_size: 2,
@@ -431,6 +431,16 @@ const properties = [
     tax: 0,
     monopoly_group_elements: [37],
     monopoly_group_id: 9
+  },
+  {
+    id: 40,
+    class: "jail-free-card",
+    name: "Chance Get out of Jail Free Card"
+  },
+  {
+    id: 41,
+    class: "jail-free-card",
+    name: "Community Get out of Jail Free Card"
   }
 ];
 

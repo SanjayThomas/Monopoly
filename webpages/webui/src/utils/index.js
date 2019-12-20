@@ -94,6 +94,7 @@ export const getTradeCandidates = (properties, playerId) => {
 };
 
 const mortgageFilter = (property, properties, myId) => {
+  if (property.class !== "street" && property.class !== "utility" && property.class !== "railroad") return false;
   if (!amIOwner(property, myId)) return false;
   if (property.houses > 0) return false;
 
