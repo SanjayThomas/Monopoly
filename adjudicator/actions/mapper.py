@@ -1,4 +1,4 @@
-from state import Phase, ACTION_TIMEOUT
+from state import Phase
 from actions.constants import DEFAULT_ACTIONS
 from twisted.internet import reactor
 
@@ -42,13 +42,15 @@ class Mapper:
 
 		for inactiveAgent in inactiveAgents:
 			# if response is None, default action will be used in response()
-			self.response(inactiveAgent, self.currentPhase, None)
+			sessionId = self.context.agents[inactiveAgent]['sessionId']
+			self.response(sessionId, self.currentPhase, None)
 
 		if len(activeAgents) > 0:
-			self.timeoutId = reactor.callLater(ACTION_TIMEOUT, self.timeoutHandler)
+			self.timeoutId = reactor.callLater(context.state.timePerMove, self.timeoutHandler)
 		
 		for activeAgent in activeAgents:
-			uri = self.context.endpoints['REQUEST'].format(self.context.gameId, activeAgent)
+			sessionId = self.context.agents[activeAgent]['sessionId']
+			uri = self.context.endpoints['REQUEST'].format(self.context.gameId, sessionId)
 			
 			# making publish API call
 			self.context.publish(uri, self.context.state.toJson())
@@ -57,7 +59,7 @@ class Mapper:
 	# if there is an error, use default action and proceed
 	def response(self,*args):
 		try:
-			agentId = args[0]
+			sessionId = args[0]
 			phase = args[1]
 		except:
 			return
@@ -66,6 +68,13 @@ class Mapper:
 			res = args[2]
 		except:
 			res = None
+
+		agentId = None
+		for a in self.agentsYetToRespond:
+			aSessionId = self.context.agents[a]['sessionId']
+			if aSessionId == sessionId:
+				agentId = a
+		print("{} with sId {} is in phase {}".format(agentId,sessionId,phase))
 
 		if (phase == self.currentPhase) and agentId in self.agentsYetToRespond:
 			self.agentsYetToRespond.remove(agentId)

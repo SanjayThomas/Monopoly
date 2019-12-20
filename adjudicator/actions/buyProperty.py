@@ -10,7 +10,6 @@ def publish(context):
 	currentPlayerId = state.getCurrentPlayerId()
 	playerPosition = state.getPosition(currentPlayerId)
 	playerCash = state.getCash(currentPlayerId)
-
 	price = board[playerPosition]['price']
 	
 	state.setPhasePayload(playerPosition)

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS tournament (
   noPpg tinyint DEFAULT NULL,
   createUserId int NOT NULL,
   createTime int NOT NULL,
+  timePerMove smallint DEFAULT 5,
   allowHumans tinyint DEFAULT 0,
   status tinyint DEFAULT 0,
   finishedGames smallint DEFAULT 0,

@@ -1,31 +1,29 @@
 import React from "react";
+import { getColors } from "utils";
 
 const Space = ({
-  highlighted,
   space,
-  togglePropertyModal,
+  setSelectedPropertyIndex,
   index,
   playersOnPosition,
-  owned
+  ownerIndex,
+  togglePropertyModal
 }) => {
   const { monopoly, price, name } = space;
+  const colors = getColors();
   return (
     <div
-      onClick={() => togglePropertyModal(true, index)}
-      className={`space ${space.class}  ${highlighted ? "highlight" : ""}`}
+      onClick={() => {setSelectedPropertyIndex(index);}} //togglePropertyModal(true, index);}}
+      className={`space ${space.class}`}
     >
-      <div
-        className={`${owned.owned ? `${owned.owner}-owner` : ""} monopoly-box`}
-      >
+      <div className={`${ownerIndex !== -1 ? `${colors[ownerIndex]}-owner` : ""} monopoly-box`}>
         {monopoly && <div className={`color-bar ${monopoly}`} />}
         {name && <div className="name">{name}</div>}
 
-        {playersOnPosition["human"] && (
-          <div className={"center-block human-present"} />
-        )}
-        {playersOnPosition["robot"] && (
-          <div className={"center-block robot-present"} />
-        )}
+        {playersOnPosition.map((v,i) => {
+          return <div key={i} className={`center-block agent-present ${colors[v]}-agent`} />;
+        })
+        }
         {price && <div className="price">Price ${price}</div>}
       </div>
     </div>

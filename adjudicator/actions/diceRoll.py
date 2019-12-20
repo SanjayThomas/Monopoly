@@ -2,7 +2,6 @@ from config import log
 from constants import board
 from actions.constants import JAIL, BOARD_SIZE, PASSING_GO_MONEY
 from state import Phase
-from constants import board
 
 # TODO: should this be broadcast?
 def publish(context):

@@ -19,7 +19,13 @@ def publish(context):
 	else :
 		if not context.dice.double:
 			log("turn","Turn {} end".format(state.getTurn()))
-			return [state.getCurrentPlayerId()]
+			agentId = state.getCurrentPlayerId()
+			currentPhase = state.getPhase()
+			agentOptions = context.agents[agentId]['agentOptions']
+			shouldPublish = agentOptions.get(currentPhase, True)
+			if not shouldPublish:
+				return []
+			return [agentId]
 		else:
 			# go to JailDecision instead
 			log("turn","Double had been rolled.")

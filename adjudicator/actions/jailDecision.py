@@ -10,28 +10,27 @@ def publish(context):
 	context.mortgagedDuringTrade = []
 	
 	state = context.state
-	currentPlayerId = state.getCurrentPlayerId()
-	playerPosition = state.getPosition(currentPlayerId)
+	agentId = state.getCurrentPlayerId()
+	playerPosition = state.getPosition(agentId)
 	if playerPosition != JAIL:
-		#player is not in jail.
 		#send the player directly to diceRoll
-		log("game","Agent {} is not in Jail.".format(currentPlayerId))
+		log("jail","Agent {} is not in Jail.".format(agentId))
 		return []
 	
-	log("game","Agent {} is in Jail.".format(currentPlayerId))
+	log("jail","Agent {} is in Jail.".format(agentId))
 	state.setPhasePayload(None)
-	return [currentPlayerId]
+	return [agentId]
 
 def subscribe(context, responses):
-	currentPlayerId,response = list(responses.items())[0]
+	agentId,response = list(responses.items())[0]
 
-	playerPosition = context.state.getPosition(currentPlayerId)
+	playerPosition = context.state.getPosition(agentId)
 	if playerPosition != JAIL:
 		context.diceThrown = False
 		return Phase.DICE_ROLL
 
 	# agent is currently in jail
-	outOfJail,diceThrown = handle_in_jail_state(context.state,response)
+	outOfJail,diceThrown = handle_in_jail_state(context.state,context.dice,response)
 
 	context.diceThrown = diceThrown
 	
@@ -42,6 +41,7 @@ def subscribe(context, responses):
 	if outOfJail:
 		return Phase.DICE_ROLL
 
+	# TODO: allow player to do mortgage,trade,sell,buy houses,unmortgage even if in jail
 	return Phase.END_TURN
 
 """
@@ -53,10 +53,10 @@ Return values are 2 boolean values:
 1. Whether the player is out of jail.
 2. Whether there was a dice throw while handling jail state.
 """
-def handle_in_jail_state(state,action):
+def handle_in_jail_state(state,dice,action):
 	currentPlayerId = state.getCurrentPlayerId()
 	
-	log("game","Agent {}'s Jail Decision: {}".format(currentPlayerId,action))
+	log("jail","Agent {}'s Jail Decision: {}".format(currentPlayerId,action))
 
 	if action=="R" or action=="P":
 		action = (action,)
@@ -67,6 +67,7 @@ def handle_in_jail_state(state,action):
 			state.addDebt(currentPlayerId,50)
 			state.setPosition(currentPlayerId,JUST_VISTING)
 			state.resetJailCounter(currentPlayerId)
+			log("jail","{} paid to get out of jail".format(currentPlayerId))
 			return [True,False]
 		
 		elif action[0] == 'C':
@@ -83,6 +84,7 @@ def handle_in_jail_state(state,action):
 					
 					state.setPosition(currentPlayerId,JUST_VISTING)
 					state.resetJailCounter(currentPlayerId)
+					log("jail","{} used the card {} to get out of jail.".format(currentPlayerId,action[1]))
 					return [True,False]
 	
 	"""If both the above method fail for some reason, we default to dice roll."""
@@ -94,6 +96,7 @@ def handle_in_jail_state(state,action):
 		dice.double_counter = 0
 		state.setPosition(currentPlayerId,JUST_VISTING)
 		state.resetJailCounter(currentPlayerId)
+		log("jail","{} rolled dice to try and get out of jail.".format(currentPlayerId))
 		return [True,True]
 	
 	state.incrementJailCounter(currentPlayerId)

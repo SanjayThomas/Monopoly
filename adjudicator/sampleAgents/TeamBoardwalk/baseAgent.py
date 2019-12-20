@@ -34,9 +34,6 @@ class BaseAgent(ApplicationSession):
 
 		self.id = res[1]
 		print("The agent was assigned the id: {}".format(self.id))
-		print("Use this ID instead of your session ID to join this game if you get disconnected")
-		print("This is a workaround to join the game again since the session ID could timeout.")
-		print("Thus, run your agent as: python agent.py <game ID> <agent ID>")
 		
 		self.endpoints = {
 			'REQUEST'   : 'monopoly.game{}.agent{}.request',
@@ -63,14 +60,14 @@ class BaseAgent(ApplicationSession):
 			#'COMMUNITY_CHEST'    :
 			#'AUCTION_RESULT'     :
 			#'MORTGAGE_RESULT'    :
+			#'UNMORTGAGE_RESULT'    :
 			#'SELL_HOUSES_RESULT' :
 			#'TRADE_RESULT'       :
 			#'BUY_HOUSES_RESULT'  :
 			'END_TURN'           : self.endTurn,
-			#'BANKRUPT'           : 
 		}
 		
-		uri = self.endpoints['REQUEST'].format(self.gameId, self.id)
+		uri = self.endpoints['REQUEST'].format(self.gameId, self.sessionId)
 		self.requestId = yield self.subscribe(self.mapper, uri, options=SubscribeOptions(get_retained=True))
 
 		print("Successfully registered!")
@@ -85,7 +82,7 @@ class BaseAgent(ApplicationSession):
 		print("Inside mapper for phase: {}".format(phase))
 		if phase in self.phaseToMethod:
 			result = self.phaseToMethod[phase](state)
-		uri = self.endpoints['RESPONSE'].format(self.gameId, self.id)
+		uri = self.endpoints['RESPONSE'].format(self.gameId, self.sessionId)
 		self.publish(uri, phase, result, options=PublishOptions(acknowledge=True,retain=True))
 
 		if phase == "END_GAME" and isinstance(jsonState['phase_payload'], dict):

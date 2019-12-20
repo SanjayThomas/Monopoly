@@ -14,7 +14,7 @@ def publish(context):
 	context.chance = Cards(chanceCards)
 	
 	if context.INITIAL_STATE == "DEFAULT":
-		context.state =  State(context.state.players)
+		context.state =  State(context.state.players,context.state.timePerMove)
 	elif context.INITIAL_STATE == "TEST_BUY_HOUSES":
 		properties = [Property(0,False,False,0,i) for i in range(NUMBER_OF_PROPERTIES)]
 		agentOne = context.state.players[0]
@@ -25,7 +25,7 @@ def publish(context):
 		properties[11].ownerId = agentTwo
 		properties[13].ownerId = agentTwo
 		properties[14].ownerId = agentTwo
-		context.state = State(context.state.players,properties)
+		context.state = State(context.state.players,context.state.timePerMove,properties)
 		
 	log("game","Game #"+str(context.gamesCompleted+1)+" started.")
 	

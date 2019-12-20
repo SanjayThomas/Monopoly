@@ -21,7 +21,8 @@ def subscribe(context,responses):
 		processTradeSuccess(context,agentId)
 	else:
 		log("game","Agent {} refused trade offer from {}!".format(agentId,state.getPhasePayload()[0]))
-
+	
+	otherAgentId = state.getPhasePayload()[0]
 	state.setPhasePayload(None)
 	context.tradeCounter+=1
 	if context.tradeCounter < MAX_TRADES:
@@ -29,7 +30,7 @@ def subscribe(context,responses):
 		return Phase.TRADE
 
 	noPlayers = len(context.state.players)
-	nextIndex = (state.getPlayerIndex(agentId) + 1) % noPlayers
+	nextIndex = (state.getPlayerIndex(otherAgentId) + 1) % noPlayers
 	nextAgentId = state.getPlayerId(nextIndex)
 	currentAgentId = state.getCurrentPlayerId()
 	context.bsmAgentId = nextAgentId
@@ -37,7 +38,7 @@ def subscribe(context,responses):
 	# resetting trade counter for other agents
 	context.tradeCounter = 0
 
-	if isBuyDecision(state) and agentId == currentAgentId:
+	if isBuyDecision(state) and otherAgentId == currentAgentId:
 		# trading is done for all agents in this turn
 		return Phase.BUY
 
@@ -70,30 +71,32 @@ def processTradeSuccess(context,agentId):
 	otherAgentId,cashOffer,propertiesOffer,cashRequest,propertiesRequest = state.getPhasePayload()
 	
 	# trade could be to escape debt where we need to clear debt accordingly
+	# if cashRequest is greater, it means agentId should pay the difference to otherAgentId
 	if cashRequest > cashOffer:
-		state.addCash(agentId,cashRequest - cashOffer)
-		state.addDebt(otherAgentId,cashRequest - cashOffer)
+		state.addDebt(agentId,cashRequest - cashOffer,otherAgentId)
 	else:
-		state.addDebt(agentId,cashOffer - cashRequest)
-		state.addCash(otherAgentId,cashOffer - cashRequest)
+		state.addDebt(otherAgentId,cashOffer - cashRequest,agentId)
 
 	for propertyRequest in propertiesRequest:
-		state.setPropertyOwner(propertyRequest,agentId)
+		state.setPropertyOwner(propertyRequest,otherAgentId)
 	for propertyOffer in propertiesOffer:
-		state.setPropertyOwner(propertyOffer,otherAgentId)
+		state.setPropertyOwner(propertyOffer,agentId)
 			
 	# Handle mortgaged properties that were involved in the trade after transferring ownership
 	mortgagedProperties = list(filter(lambda propertyId : state.isPropertyMortgaged(propertyId), propertiesOffer + propertiesRequest))
 	for mortgagedProperty in mortgagedProperties:
-		if mortgagedProperty not in context.mortgagedDuringTrade:
-			context.mortgagedDuringTrade.append(mortgagedProperty)
-			space = board[mortgagedProperty]
-			propertyPrice = space['price']
-			mortgagedPrice = int(propertyPrice/2)
-			agentInQuestion = state.getPropertyOwner(mortgagedProperty)
+		if mortgagedProperty in context.mortgagedDuringTrade:
+			continue
+		
+		context.mortgagedDuringTrade.append(mortgagedProperty)
+		propertyPrice = board[mortgagedProperty]['price']
+		mortgagedPrice = int(propertyPrice/2)
+		agentInQuestion = state.getPropertyOwner(mortgagedProperty)
 
-			# TODO: could this be done better?
-			# We're not checking in handleTrade if the agent has enough cash for this
-			state.addDebt(agentId,int(mortgagedPrice*0.1))
+		# TODO: could this be done better?
+		# We're not checking in handleTrade if the agent has enough cash
+		# when a mortgaged property is traded, the new owner needs to pay
+		# its interest immediately to the bank
+		state.addDebt(agentInQuestion,int(mortgagedPrice*0.1))
 
-	log("game","Trade request from agent {} to {} was a success!".format(agentId, otherAgentId))
+	log("game","Trade request from agent {} to {} was a success!".format(otherAgentId,agentId))

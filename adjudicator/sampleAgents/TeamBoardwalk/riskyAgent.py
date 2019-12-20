@@ -139,7 +139,7 @@ class RiskyAgent(BaseAgent):
 							break
 					if breakCondition:
 						break
-				print("Prop offered: {}".format(propOffer))
+				print("Trade Offer: {}".format([opp_id,cashOffer,propOffer,10,[opp_prop]]))
 				return [opp_id,cashOffer,propOffer,10,[opp_prop]]
 
 		return None
@@ -226,7 +226,7 @@ if __name__ == '__main__':
 		sys.exit("Not enough arguments")
 	
 	url = environ.get("CBURL", u"ws://localhost:4000/ws")
-	#url = environ.get("CBURL", u"ws://localhost/ws")
+	#url = environ.get("CBURL", u"ws://monopoly-ai.com/ws")
 	if six.PY2 and type(url) == six.binary_type:
 		url = url.decode('utf8')
 	realm = environ.get('CBREALM', u'realm1')

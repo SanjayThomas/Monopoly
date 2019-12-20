@@ -4,17 +4,32 @@ from state import Phase
 from utils import typecast
 from actions.constants import BOARD_SIZE
 
+# does the agent have any properties he can mortgage/unmortgage?
+# the result of this function is the list of agents for whom we should
+# call mortgage/unmortgage
 def publish(context):
-	# call agent if:
-	# not bankrupt
-	# has houses on any property
 	agentId = context.bsmAgentId
 	state = context.state
 
-	if state.bankrupt[agentId] or (getPropertiesCount(state,agentId) == 0):
+	if state.bankrupt[agentId]:
 		return []
 	
-	log("game","Agent {} has properties to (un)mortgage!".format(agentId))
+	if state.getPhase() == Phase.MORTGAGE:
+		candidates = []
+		for p in state.properties:
+			if canMortgage(p.propertyId,agentId,state):
+				candidates.append(p.propertyId)
+		if len(candidates) == 0:
+			return []
+		log("bsm","Agent {} has properties to mortgage!".format(agentId))
+	else:
+		candidates = []
+		for p in state.properties:
+			if canUnmortgage(p.propertyId,agentId,state):
+				candidates.append(p.propertyId)
+		if len(candidates) == 0:
+			return []
+		log("bsm","Agent {} has properties to unmortgage!".format(agentId))
 	
 	return [agentId]
 
@@ -27,24 +42,14 @@ def subscribe(context, responses):
 	# for now, if any entry in the sequence is invalid, the whole sequence is invalidated
 	if validateMortgageSequence(sequence):
 		if currentPhase == Phase.MORTGAGE:
-			res = handleMortgage(context,agentId,sequence)
-			log("game","Result of mortgage sequence by agent {}: {}".format(agentId,res))
+			res = handleMortgage(state,agentId,sequence)
 		else:
 			res = handleUnmortgage(context,agentId,sequence)
-			log("game","Result of unmortgage sequence by agent {}: {}".format(agentId,res))
+			log("bsm","Result of unmortgage sequence by agent {}: {}".format(agentId,res))
 
 	if currentPhase == Phase.MORTGAGE:
 		return Phase.SELL_HOUSES
 	return Phase.BUY_HOUSES
-
-# total number of properties owned by the agent
-def getPropertiesCount(state, agentId):
-	propCount = 0
-	for p in state.properties:
-		if state.rightOwner(agentId, p.propertyId):
-			propCount += 1
-
-	return propCount
 
 # checks if response from agent follows proper structure
 def validateMortgageSequence(sequence):
@@ -52,41 +57,51 @@ def validateMortgageSequence(sequence):
 		return False
 	
 	sequence = [typecast(prop,int,-1) for prop in sequence]
-	for prop in sequence:
-		if prop<0 or prop>BOARD_SIZE-1:
-			return False
+	return True
 
+def canMortgage(propertyId,playerId,state):
+	if propertyId<0 or propertyId>BOARD_SIZE-1:
+		return False
+	if not state.rightOwner(playerId,propertyId):
+		return False
+	if state.isPropertyMortgaged(propertyId):
+		return False
+	if state.getNumberOfHouses(propertyId)>0:
+		return False
+	monopolyProps = board[propertyId]["monopoly_group_elements"]
+	for monopolyProp in monopolyProps:
+		if state.getNumberOfHouses(monopolyProp)>0:
+			return False
+	return True
+
+def canUnmortgage(propertyId,playerId,state):
+	if propertyId<0 or propertyId>BOARD_SIZE-1:
+		return False
+	if not state.rightOwner(playerId,propertyId):
+		return False
+	if not state.isPropertyMortgaged(propertyId):
+		return False
 	return True
 
 # If property is mortgaged, player gets back 50% of the price.
 # If the player tries to unmortgage something and he doesn't have the money, the entire operation fails.
 # If the player tries to mortgage an invalid property, entire operation fails.
-def handleMortgage(context,playerId,properties):
-	state = context.state
+def handleMortgage(state,playerId,properties):
 	cash = 0
 	
 	for propertyId in properties:
-		if not state.rightOwner(playerId,propertyId):
+		if not canMortgage(propertyId,playerId,state):
+			log("bsm","Mortgage request {} from {} failed.".format(properties,playerId))
 			return False
-		
-		if not state.isPropertyMortgaged(propertyId):
-			#There should be no houses on a property to be mortgaged or in any other property in the monopoly.
-			if state.getNumberOfHouses(propertyId)>0:
-				return False
-			space = board[propertyId]
-			for monopolyPropertyId in space["monopoly_group_elements"]:
-				if state.getNumberOfHouses(propertyId)>0:
-					return False
 
-			mortagePrice = int(board[propertyId]['price']/2)
-			cash += mortagePrice
-			log("bsm","Agent {} wants to mortgage {}".format(playerId,propertyId))
+		mortagePrice = int(board[propertyId]['price']/2)
+		cash += mortagePrice
 	
 	# actually applying state changes
 	for propertyId in properties:
 		state.setPropertyMortgaged(propertyId,True)
 	state.addCash(playerId,cash)
-
+	log("bsm","Agent {} mortgaged {} to get ${}".format(playerId,properties,cash))
 	return True
 
 # If the player tries to unmortgage something and he doesn't have the money, the entire operation fails.
@@ -96,27 +111,24 @@ def handleUnmortgage(context,playerId,properties):
 	playerCash = state.getCash(playerId)
 	
 	for propertyId in properties:
-		if not state.rightOwner(playerId,propertyId):
+		if not canUnmortgage(propertyId,playerId,state):
+			log("bsm","Unmortgage request {} from {} failed.".format(properties,playerId))
 			return False
 		
-		if state.isPropertyMortgaged(propertyId):
-			unmortgagePrice = int(board[propertyId]['price']/2)   
+		unmortgagePrice = int(board[propertyId]['price']/2)   
+		if propertyId in context.mortgagedDuringTrade:
+			context.mortgagedDuringTrade.remove(propertyId)
+		else:
+			unmortgagePrice = int(unmortgagePrice*1.1)
 
-			if propertyId in context.mortgagedDuringTrade:
-				context.mortgagedDuringTrade.remove(propertyId)
-			else:
-				unmortgagePrice = int(unmortgagePrice*1.1)
-
-			if playerCash < unmortgagePrice:
-				return False
-			
-			playerCash -= unmortgagePrice 
-			
-			log("bsm","Agent {} wants to unmortgage {}".format(playerId,propertyId))
+		if playerCash < unmortgagePrice:
+			return False
+		
+		playerCash -= unmortgagePrice 
 	
 	# actually applying state changes
 	for propertyId in properties:
 		state.setPropertyMortgaged(propertyId,False)
 	state.setCash(playerId,playerCash)
-
+	log("bsm","Agent {} unmortgaged {}.".format(playerId,properties))
 	return True

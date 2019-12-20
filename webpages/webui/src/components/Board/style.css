@@ -1,33 +1,42 @@
 .brown {
-  background: brown;
+  background: brown !important;
+  border-color: brown !important;
 }
 
 .light-blue {
-  background: #d2eaf5;
+  background: #d2eaf5 !important;
+  border-color: #d2eaf5 !important;
+  color: black !important;
 }
 
 .pink {
-  background: pink;
+  background: pink !important;
+  border-color: pink !important;
 }
 
 .orange {
-  background: #fa811d;
+  background: #fa811d !important;
+  border-color: #fa811d !important;
 }
 
 .red {
-  background: #f50c2b;
+  background: #f50c2b !important;
+  border-color: #f50c2b !important;
 }
 
 .yellow {
-  background: #ffed20;
+  background: #ffed20 !important;
+  border-color: #ffed20 !important;
 }
 
 .green {
-  background: #41994e;
+  background: #41994e !important;
+  border-color: #41994e !important;
 }
 
 .dark-blue {
-  background: #5a6dba;
+  background: #5a6dba !important;
+  border-color: #5a6dba !important;
 }
 
 .highlight {
@@ -37,10 +46,6 @@
 /* end monopoly */
 
 /* start monopoly board properties */
-.monopoly-table {
-  padding-left: 50px;
-  padding-right: 50px;
-}
 
 .board {
   display: grid;
@@ -79,7 +84,7 @@
   margin-left: 20%;
   margin-right: 20%;
   margin-top: 50px;
-  height: 200px;
+  height: 240px;
   border: 1px solid red;
   padding: 10px;
   font-size: 14px;
@@ -87,17 +92,12 @@
 }
 
 .player-actions {
-  margin-left: 20%;
-  margin-right: 20%;
-  border: 1px solid blue;
+  margin-left: 8%;
+  margin-right: 8%;
   padding: 10px;
   font-size: 14px;
   flex: 1 100%;
   margin-bottom: 50px;
-}
-
-.player-actions button {
-  margin: 10px;
 }
 
 /* middle of the board */
@@ -213,7 +213,7 @@
   font-size: 12px;
 }
 .space .price {
-  font-size: 7px;
+  font-size: 10px;
   font-weight: bold;
   padding-bottom: 5px;
 }
@@ -450,23 +450,73 @@
 
 /* end monopoly board properties */
 
-.human-present {
+.agent-present {
   height: 15px;
   width: 15px;
+}
+
+.red-agent {
   background: red;
 }
-.robot-present {
-  height: 15px;
-  width: 15px;
+
+.blue-agent {
   background: blue;
 }
 
-.human-owner {
+.green-agent {
+  background: green;
+}
+
+.gold-agent {
+  background: gold;
+}
+
+.cyan-agent {
+  background: cyan;
+}
+
+.magenta-agent {
+  background: #8B008B;
+}
+
+.orange-agent {
+  background: #FF8C00;
+}
+
+.pink-agent {
+  background: #EE82EE;
+}
+
+.red-owner {
   border-bottom: 5px solid red;
 }
 
-.robot-owner {
+.blue-owner {
   border-bottom: 5px solid blue;
+}
+
+.green-owner {
+  border-bottom: 5px solid green;
+}
+
+.gold-owner {
+  border-bottom: 5px solid gold;
+}
+
+.cyan-owner {
+  border-bottom: 5px solid cyan;
+}
+
+.magenta-owner {
+  border-bottom: 5px solid #8B008B;
+}
+
+.orange-owner {
+  border-bottom: 5px solid #FF8C00;
+}
+
+.pink-owner {
+  border-bottom: 5px solid #EE82EE;
 }
 
 /*  */
@@ -485,4 +535,28 @@
 .next-move {
   margin-left: 15px;
   margin-right: 15px;
+}
+
+.construct-group {
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+
+.cst-btn {
+  display: block !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cst-ig {
+  width: 80% !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* auction */
+.cube {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
 }

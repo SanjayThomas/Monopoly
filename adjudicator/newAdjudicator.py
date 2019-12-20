@@ -23,6 +23,7 @@ import actions.handleTrade
 import actions.tradeResponse
 import actions.buyHouses
 import actions.endGame
+import actions.receiveState
 
 import actions.startTurn
 import actions.diceRoll
@@ -48,6 +49,7 @@ class Adjudicator(ApplicationSession):
         self.gameId = sys.argv[1]
         self.noPlayers = int(sys.argv[2])
         self.noGames = int(sys.argv[3])
+        self.timePerMove = int(sys.argv[4])
 
         #self.gameId = 1
         #self.noPlayers = 2
@@ -84,11 +86,11 @@ class Adjudicator(ApplicationSession):
             Phase.COMMUNITY_CHEST    : False,
             Phase.AUCTION_RESULT     : False,
             Phase.MORTGAGE_RESULT    : False,
+            Phase.UNMORTGAGE_RESULT  : False,
             Phase.SELL_HOUSES_RESULT : False,
             Phase.TRADE_RESULT       : False,
             Phase.BUY_HOUSES_RESULT  : False,
-            Phase.END_TURN           : False,
-            Phase.BANKRUPT           : False
+            Phase.END_TURN           : False
         }
 
         self.phaseToClass = {
@@ -112,7 +114,6 @@ class Adjudicator(ApplicationSession):
                 'subscribe' : actions.buyProperty.subscribe,
                 'broadcast' : False
             },
-            #Phase.BUY_RESULT         : BuyResult,
             Phase.AUCTION            : {
                 'publish'   : actions.auctionProperty.publish,
                 'subscribe' : actions.auctionProperty.subscribe,
@@ -121,32 +122,32 @@ class Adjudicator(ApplicationSession):
             Phase.MORTGAGE           : {
                 'publish'   : actions.mortgage.publish,
                 'subscribe' : actions.mortgage.subscribe,
-                'broadcast' : False # TODO
+                'broadcast' : False
             },
             Phase.UNMORTGAGE           : {
                 'publish'   : actions.mortgage.publish,
                 'subscribe' : actions.mortgage.subscribe,
-                'broadcast' : False # TODO
+                'broadcast' : False
             },
             Phase.SELL_HOUSES        : {
                 'publish'   : actions.sellHouses.publish,
                 'subscribe' : actions.sellHouses.subscribe,
-                'broadcast' : False # TODO
+                'broadcast' : False
             },
             Phase.TRADE              : {
                 'publish'   : actions.handleTrade.publish,
                 'subscribe' : actions.handleTrade.subscribe,
-                'broadcast' : False # TODO
+                'broadcast' : False
             },
             Phase.TRADE_RESPONSE     : {
                 'publish'   : actions.tradeResponse.publish,
                 'subscribe' : actions.tradeResponse.subscribe,
-                'broadcast' : False # TODO
+                'broadcast' : False
             },
             Phase.BUY_HOUSES         : {
                 'publish'   : actions.buyHouses.publish,
                 'subscribe' : actions.buyHouses.subscribe,
-                'broadcast' : False # TODO
+                'broadcast' : False
             },
             Phase.END_TURN           : {
                 'publish'   : actions.endTurn.publish,
@@ -158,7 +159,6 @@ class Adjudicator(ApplicationSession):
                 'subscribe' : actions.endGame.subscribe,
                 'broadcast' : True
             },
-            #Phase.JAIL_RESULT        : JailResult,
             Phase.DICE_ROLL          : {
                 'publish'   : actions.diceRoll.publish,
                 'subscribe' : actions.diceRoll.subscribe,
@@ -174,12 +174,46 @@ class Adjudicator(ApplicationSession):
                 'subscribe' : actions.cards.subscribe,
                 'broadcast' : False
             },
-            #Phase.AUCTION_RESULT     : AuctionResult,
-            #Phase.MORTGAGE_RESULT    : MortgageResult,
-            #Phase.SELL_HOUSES_RESULT : SellHousesResult,
-            #Phase.TRADE_RESULT       : TradeResult,
-            #Phase.BUY_HOUSES_RESULT  : BuyHousesResult,
-            #Phase.BANKRUPT           : Bankrupt
+            Phase.BUY_RESULT         : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.JAIL_RESULT        : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.AUCTION_RESULT     : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.MORTGAGE_RESULT    : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.UNMORTGAGE_RESULT  : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.SELL_HOUSES_RESULT : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.TRADE_RESULT       : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            },
+            Phase.BUY_HOUSES_RESULT  : {
+                'publish'   : actions.receiveState.publish,
+                'subscribe' : actions.receiveState.subscribe,
+                'broadcast' : True
+            }
         }
         
         #determines the state to be used as initial state
@@ -258,7 +292,8 @@ class Adjudicator(ApplicationSession):
             }
             self.logger("{} agents have joinedout of {}".format(len(self.agents),self.noPlayers))
             if len(self.agents) == self.noPlayers:
-                self.startGame()
+                # start the game after 10 seconds, allow time for the newly joined agent
+                reactor.callLater(10, self.startGame)
             
             self.logger("Player {} has joined the game.".format(creds['email']))
             return [0,creds['email']]
@@ -378,7 +413,7 @@ class Adjudicator(ApplicationSession):
         self.dice = Dice()
         self.chest = Cards(communityChestCards)
         self.chance = Cards(chanceCards)
-        self.state =  State(PLAY_ORDER)
+        self.state =  State(PLAY_ORDER,self.timePerMove)
         self.mortgagedDuringTrade = []
 
         # used during JailDecision
@@ -393,10 +428,11 @@ class Adjudicator(ApplicationSession):
         self.mapper = Mapper(self)
 
         for agentId in PLAY_ORDER:
-            uri = self.endpoints['RESPONSE'].format(self.gameId, agentId)
-            sub = yield self.subscribe(partial(self.mapper.response,agentId), uri)
+            sessionId = self.agents[agentId]['sessionId']
+            uri = self.endpoints['RESPONSE'].format(self.gameId, sessionId)
+            sub = yield self.subscribe(partial(self.mapper.response,sessionId), uri)
             self.agents[agentId]['subKeys'].append(sub)
-        
+
         self.mapper.request()
     
 if __name__ == '__main__':

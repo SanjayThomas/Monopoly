@@ -9,9 +9,6 @@ MAX_HOUSES = 32
 MAX_HOTELS = 12
 NUMBER_OF_PROPERTIES = 42
 
-# timeout for each action of the agent
-ACTION_TIMEOUT = 5
-
 class Property:
 	def __init__(self,houses,mortgaged,ownerId,propertyId):
 		self.houses = houses # value in range 0-5
@@ -23,10 +20,11 @@ class Property:
 		return {"houses":self.houses,"mortgaged":self.mortgaged,"ownerId":self.ownerId}
 
 class State:
-	def __init__(self, playerIds,properties=None):		
+	def __init__(self,playerIds,timePerMove,properties=None):
 		#List of id's of all the agents in the order in which the game will take place.
 		self.players = list(playerIds)
 		self.TOTAL_NO_OF_PLAYERS = len(playerIds)
+		self.timePerMove = timePerMove
 		
 		self.turnNumber = -1
 		self.currentPlayerId = None
@@ -348,7 +346,7 @@ class State:
 					("player_loss_status", self.bankrupt),
 					("phase", self.phase),
 					("phase_payload", self.phasePayload),
-					("timeout",ACTION_TIMEOUT)])
+					("timeout",self.timePerMove)])
 	
 	def toJson(self):
 		return json.dumps(self.toDict())
@@ -371,7 +369,8 @@ class Phase:
 	UNMORTGAGE         = 'UNMORTGAGE'
 	
 	MORTGAGE_RESULT    = 'MORTGAGE_RESULT' # optional,returns tuple of booleans saying which requests were successful
-	
+	UNMORTGAGE_RESULT  = 'UNMORTGAGE_RESULT'
+
 	SELL_HOUSES        = 'SELL_HOUSES'
 	
 	SELL_HOUSES_RESULT = 'SELL_HOUSES_RESULT'
@@ -393,8 +392,6 @@ class Phase:
 	
 	END_TURN           = 'END_TURN' # optional
 	END_GAME           = 'END_GAME'
-
-	BANKRUPT           = 'BANKRUPT' # this agent is bankrupt
 
 
 # Phase Payload definition:

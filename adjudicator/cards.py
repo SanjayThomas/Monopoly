@@ -34,7 +34,7 @@ class Cards:
 	def draw_card(self):
 		drawn_card = self.deck.pop(0)
 
-		if drawn_card['type'] is not 4:
+		if drawn_card['type'] != 4:
 			self.deck.append(drawn_card)
 		
 		return drawn_card

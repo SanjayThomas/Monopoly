@@ -1,0 +1,15 @@
+.updates-panel a {
+	text-transform: none;
+	font-size: 16px;
+	font-weight: bold;
+}
+
+.sub-panel {
+  padding: 10px;
+  text-align: left;
+  text-transform: none;
+  font-size: 12px;
+}
+.sub-panel p {
+  margin: 0;
+}

@@ -1,22 +1,38 @@
-from actions.action import Action
+from config import log
+from state import Phase
+from constants import board
 
-class ReceiveState(Action):
-	
-	# publishes to all agents
-	def publish(self):
-		self.agentsYetToRespond = self.state.getLivePlayers()
-		currentPlayerId = self.state.getCurrentPlayerId()
-		self.publishAction(currentPlayerId,"BROADCAST_IN")
-	
-	def subscribe(self,*args):
-		agentId = None
-		if len(args)>0:
-			agentId = args[0]
-		
-		print("Agent "+str(agentId)+" accessed the subscribe of ReceiveState.")
-		
-		if agentId and self.canAccessSubscribe(agentId) and self.validSubs>=len(self.state.getLivePlayers()):
-			nextAction = getattr(self.context, self.nextAction)
-			
-			nextAction.setContext(self.context)
-			nextAction.publish()
+# called for all RESULT phases
+# these phases are simply to let the agents know whether the previous action
+# was successful or not
+def publish(context):
+	state = context.state
+	return context.state.players
+
+def subscribe(context, responses):
+	state = context.state
+	payload = state.getPhasePayload()
+	context.state.setPhasePayload(None)
+	currentPhase = state.getPhase()
+
+	if currentPhase == Phase.AUCTION_RESULT:
+		return Phase.UNMORTGAGE
+	if currentPhase == Phase.MORTGAGE_RESULT:
+		return Phase.SELL_HOUSES
+	if currentPhase == Phase.SELL_HOUSES_RESULT:
+		return Phase.TRADE
+	if currentPhase == TRADE_RESULT:
+		pass
+	if currentPhase == Phase.BUY_HOUSES_RESULT:
+		currentAgentId = state.getCurrentPlayerId()
+		if context.bsmAgentId == currentAgentId:
+			return Phase.END_TURN
+		return Phase.UNMORTGAGE
+	if currentPhase == Phase.BUY_RESULT:
+		return Phase.MORTGAGE
+	if currentPhase == Phase.JAIL_RESULT:
+		if payload:
+			return Phase.DICE_ROLL
+		return Phase.END_TURN
+	if currentPhase == Phase.UNMORTGAGE_RESULT:
+		return Phase.BUY_HOUSES

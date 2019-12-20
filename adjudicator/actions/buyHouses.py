@@ -8,7 +8,7 @@ from actions.constants import BOARD_SIZE,MEDAVE_BUILDCOST,MONOPOLY_GROUPS
 def publish(context):
 	# call agent if:
 	# not bankrupt
-	# has all properties in a monopoly group
+	# has all properties in atleast one monopoly group
 	# has money required to buy atleast one of the least expensive houses
 	state = context.state
 	agentId = context.bsmAgentId
@@ -16,8 +16,7 @@ def publish(context):
 	if state.bankrupt[agentId] or not canBuyHouses(state,agentId):
 		return []
 
-	log("game","Agent {} can buy houses/hotels!".format(agentId))
-	
+	log("bsm","Agent {} can buy houses/hotels!".format(agentId))
 	return [agentId]
 
 # responses is a dict mapping agentId to response
@@ -28,8 +27,7 @@ def subscribe(context, responses):
 	# check if given buying sequence is valid and apply it if it is
 	# for now, if any entry in the sequence is invalid, the whole sequence is invalidated
 	if validateBuyingSequence(sequence) and state.isBuyingSequenceValid(agentId,sequence):
-		log("game","The buying sequence for agent {} is valid.".format(agentId))
-		# handle selling
+		log("bsm","The buying sequence {} for {} is valid.".format(sequence,agentId))
 		playerCash = state.getCash(agentId)
 		for propertyId,houses in sequence:
 			houseCount = state.getNumberOfHouses(propertyId)
